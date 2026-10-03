@@ -1,5 +1,22 @@
 # Codex Engineering Harness 3.1.0 — Installation & Release Guide
 
+## 最快安装（新机器）
+
+先完成 `gh auth login`，然后执行：
+
+```bash
+gh api repos/yelei1027/codex-engineering-harness-v3/contents/scripts/install-release.sh --jq .content | base64 -d | bash
+```
+
+安装完成后，每个项目只需要：
+
+```bash
+cd "/你的项目路径"
+harness start .
+```
+
+详细说明见仓库首页 README。已有 Harness 不要重复运行安装脚本；版本更新走 `harness update` 候选验收流程。
+
 ## 1. Install the prepared control plane
 
 ```bash
