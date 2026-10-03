@@ -470,4 +470,20 @@ class HarnessCase(unittest.TestCase):
         self.assertEqual(link,{'kind':'symlink','target':'README.md','sha256_target':sha(b'README.md')})
         self.assertEqual(os.readlink(root/'vendor/example/AGENTS.md'),link['target'])
 
+    def test_start_resolves_locked_ocr_in_new_process_after_user_path(self):
+        import sys
+        release=self.fake_release();tool_dir=release/'runtimes/node/node_modules/.bin';tool_dir.mkdir(parents=True)
+        ocr=tool_dir/'ocr';ocr.write_text('#!/bin/sh\necho locked-ocr\n');ocr.chmod(0o755)
+        codex=release/'fake-codex';codex.write_text('#!/usr/bin/env python3\nimport json,os,shutil\nprint(json.dumps({"ocr":shutil.which("ocr"),"cwd":os.getcwd(),"PATH":os.environ["PATH"]}))\n');codex.chmod(0o755)
+        binding=read_json(release/'machine-binding.json');binding['codex_binary']=str(codex);write_json(release/'machine-binding.json',binding)
+        parent_path=os.environ.get('PATH')
+        with patch.object(cli,'ROOT',release):cli.enable(self.repo,'L1')
+        env=dict(os.environ);env['PATH']='/usr/bin:/bin'
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'start',str(self.repo)],capture_output=True,env=env)
+        self.assertEqual(process.returncode,0,process.stderr.decode()+process.stdout.decode())
+        result=json.loads(process.stdout)
+        self.assertEqual(result['ocr'],str(ocr));self.assertEqual(result['cwd'],str(self.repo))
+        self.assertTrue(result['PATH'].startswith('/usr/bin:/bin:'))
+        self.assertEqual(os.environ.get('PATH'),parent_path)
+
 if __name__=='__main__':unittest.main()

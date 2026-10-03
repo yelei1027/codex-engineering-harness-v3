@@ -455,7 +455,7 @@
         "compatibility"
       ],
       "upstream_frontmatter_removed": {
-        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint — delegation mode is LLM-free on the OCR side.\n"
+        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint \u2014 delegation mode is LLM-free on the OCR side.\n"
       },
       "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
       "behavior": {
@@ -469,9 +469,9 @@
       "name": "harness-dev",
       "component": "harness",
       "source": "local V3 contract",
-      "installed_sha256": "c3c56cceaa9645699a9609927c280e89b667795860965bfc7c438876da9b3e18",
+      "installed_sha256": "9d2922a9a4280029909352a4acfadb7f7c8e624c0e1e5ea4bee3fe546837e15c",
       "allow_implicit_invocation": true,
-      "runtime_selection": "UNVERIFIED"
+      "runtime_selection": "BASE_ROUTER_REAL_NATIVE_PASS; CLI_BINDING_HINT_ADDED_AFTER_ACCEPTANCE"
     },
     {
       "name": "harness-doctor",

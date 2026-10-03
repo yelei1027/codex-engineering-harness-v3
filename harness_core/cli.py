@@ -312,6 +312,21 @@ def package(destination):
     atomic(Path(str(destination)+'.sha256'),(sha(destination.read_bytes())+'  '+destination.name+'\n').encode(),0o644)
     return {'status':'PACKAGED','path':str(destination),'sha256':sha(destination.read_bytes()),'files':len(files),'offline_install':'UNVERIFIED'}
 
+def session_environment():
+    """Expose locked tool CLIs only to the new Codex process, after the user's PATH."""
+    binding=machine_binding()
+    defaults=[ROOT/'runtimes/node/node_modules/.bin',ROOT/'runtimes/markitdown/bin',ROOT/'runtimes/powercontext/client-venv/bin']
+    configured=binding.get('tool_path_dirs',[])
+    if not isinstance(configured,list) or not all(isinstance(p,str) and Path(p).is_absolute() for p in configured):
+        raise HarnessError('machine-binding tool_path_dirs must be an array of absolute directories')
+    environment=os.environ.copy()
+    paths=environment.get('PATH','').split(os.pathsep) if environment.get('PATH') else []
+    for directory in [*defaults,*map(Path,configured)]:
+        value=str(directory)
+        if directory.is_dir() and value not in paths:paths.append(value)
+    environment['PATH']=os.pathsep.join(paths)
+    return environment
+
 def main():
     parser=argparse.ArgumentParser(description='Project-scoped Codex Engineering Harness V3; preserves unknown user configuration.')
     subs=parser.add_subparsers(dest='command',required=True)
@@ -342,7 +357,7 @@ def main():
         if command=='start':
             doc=project_binding(repo);verify_owned(registry().get(str(repo),{}))
             argv=[doc['codex_binary'],*(args.codex_args[1:] if args.codex_args[:1]==['--'] else args.codex_args)]
-            os.chdir(repo);os.execv(argv[0],argv)
+            os.chdir(repo);os.execve(argv[0],argv,session_environment())
         if command in {'install','enable','disable','rollback','uninstall','update'}:
             with lock(state_dir()/'operation.lock'):
                 if command=='install':result=install()

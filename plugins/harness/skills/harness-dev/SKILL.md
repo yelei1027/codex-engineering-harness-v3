@@ -10,6 +10,8 @@ description: Develop, fix, refactor, or review code in a project enabled for Cod
 
 Operate only when this project's `.harness/state/project.json` records the binding as enabled. Resolve the repo and actual installed Harness path; use its `bin/harness --help` and `status <repo>` to verify binding. An explicit skill mention alone cannot enable another repo. In an unbound project, explain how to enable it; do not write project state. Pure explanation ends at ZINFO.
 
+For the `ocr` and `codegraph` CLI methods, read the bound Harness root's `machine-binding.json` and use the absolute executable in `component_commands.<name>[0]`. Desktop sessions may lack these isolated tools on PATH. Resolve the binding before diagnosing an installation failure or installing another copy. `harness start` adds the managed tool directories to its child session's PATH.
+
 The [workflow contract](references/workflow.json) is design data, not a native Codex API. Read the nodes needed for the current branch, their conditions and edges, rather than injecting the whole contract. Use real tool calls or processes. State transitions are recorded with actual `task` commands shown by `--help`; never fabricate a completed node, tool, child, evidence or API parameter. Main is the only outer orchestrator.
 
 ## Select and bind
