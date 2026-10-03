@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "harness_version": "3.0.0",
+  "harness_version": "3.1.0",
   "registration_owner": "project binding chooses single plugin or standalone skills source, never both",
   "runtime_selection": "UNVERIFIED",
   "skills": [

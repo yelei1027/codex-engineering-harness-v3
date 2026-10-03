@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "version": "3.1.0",
+  "runtime": "/usr/lib/chatgpt/resources/codex",
+  "runtime_version": "0.160.0",
+  "project": "/home/yelei/文档/ChatGPT/harness-v3-deep-smoke-20261003/l2",
+  "trust": {
+    "project_handlers": 10,
+    "trusted": 10,
+    "untrusted_or_disabled": 0,
+    "warnings": [],
+    "errors": []
+  },
+  "native_lifecycle": {
+    "SessionStart": "PASS_x2",
+    "UserPromptSubmit": "PASS",
+    "Stop": "PASS",
+    "PreCompact": "PASS_x2",
+    "PostCompact": "PASS",
+    "recovery_result": "RESUME_OK",
+    "resume_task": "hook-native-accept-20261003",
+    "resume_node": "A01"
+  },
+  "evidence": {
+    "session_rollout": "/home/yelei/.codex/sessions/2026/10/03/rollout-2026-10-03T15-09-47-01a10096-9382-7d73-8b15-ea945d3e93e3_01a10098-f7b1-7012-9308-57d1006ba379.jsonl",
+    "note": "The rollout contains the native PostCompact additional context RESUME_OK. The temporary acceptance task and checkpoint state were removed after verification."
+  }
+}

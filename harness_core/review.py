@@ -4,7 +4,7 @@ import stat
 import shutil
 import subprocess
 from pathlib import Path
-from .common import HarnessError, atomic, canonical, git, new_id, now, private_path, read_json, safe_id, sha, write_json
+from .common import HarnessError, atomic, canonical, empty_tree, git, git_head, new_id, now, private_path, read_json, safe_id, sha, write_json
 
 
 def names(data):
@@ -12,11 +12,12 @@ def names(data):
 
 
 def selected(repo, base):
-    head = git(repo, 'rev-parse', 'HEAD').decode().strip()
-    fixed = git(repo, 'merge-base', base, head).decode().strip()
+    head = git_head(repo)
+    tree = empty_tree(repo)
+    fixed = tree if base == tree else git(repo, 'merge-base', base, head).decode().strip()
     committed=names(git(repo,'diff','--name-only','--no-renames','-z',fixed,head))
-    workspace=names(git(repo,'diff','--name-only','--no-renames','-z','HEAD'))
-    staged=names(git(repo,'diff','--cached','--name-only','--no-renames','-z','HEAD'))
+    workspace=names(git(repo,'diff','--name-only','--no-renames','-z',head))
+    staged=names(git(repo,'diff','--cached','--name-only','--no-renames','-z',head))
     untracked=names(git(repo,'ls-files','--others','--exclude-standard','-z'))
     tracked=names(git(repo,'ls-files','-z'))
     changed=set(committed+workspace+staged+untracked)
@@ -59,8 +60,8 @@ def fingerprint(repo, base, paths=None):
     paths=sorted(p for p in (all_paths if paths is None else paths) if not private_path(p))
     images=[file_image(repo,p) for p in paths]
     value={'head':head,'base':fixed,'files':images,
-           'index':sha(patch_bytes(repo,['--cached','HEAD'],paths)),
-           'tracked':sha(patch_bytes(repo,['HEAD'],paths))}
+           'index':sha(patch_bytes(repo,['--cached',head],paths)),
+           'tracked':sha(patch_bytes(repo,[head],paths))}
     return sha(canonical(value)),value
 
 
@@ -96,7 +97,7 @@ def freeze(repo, task, base, spec=None, checks=None, allowlist=None):
     snapshot=new_id('snapshot');destination=repo/'.harness-artifacts/review'/task/snapshot
     temporary=destination.with_name('.'+snapshot);temporary.mkdir(parents=True)
     try:
-        for name,args in [('committed.patch',[fixed,head]),('tracked.patch',['HEAD']),('index.patch',['--cached','HEAD'])]:
+        for name,args in [('committed.patch',[fixed,head]),('tracked.patch',[head]),('index.patch',['--cached',head])]:
             atomic(temporary/name,patch_bytes(repo,args,reviewable))
         entries=[]
         for p in paths:

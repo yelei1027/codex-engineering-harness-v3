@@ -1,0 +1,30 @@
+{
+  "version": "3.1.0",
+  "date": "2026-10-03",
+  "release_hash": "31006253db5654f14ab7c7460123da7b0b3c2e9362240e8618ff10265de6f2e2",
+  "status": "PASS_WITH_OPTIONAL_BLOCK",
+  "harness_status": "PASS_WITH_OPTIONAL_BLOCK",
+  "categories": {
+    "STATIC": {"status": "PASS", "evidence": "harness check + git diff --check"},
+    "CORE_TESTS": {"status": "PASS", "evidence": "64 passed, 4 subtests passed"},
+    "RUNTIME": {"status": "PASS", "codex": "0.160.0", "mode": "desktop"},
+    "SKILLS": {"status": "PASS", "evidence": "native app-server inventory discovered 22 repo-scoped Harness skills in the trusted L2 project"},
+    "MCP": {"status": "PASS", "evidence": "reports/final-mcp-runtime-smoke-3.1.0.json", "components": ["context-mode", "CodeGraph", "MarkItDown", "PowerContext Basic"]},
+    "HOOKS": {"status": "PASS", "evidence": "reports/native-hook-lifecycle-3.1.0.json", "project_handlers": 10, "native_lifecycle": "PASS"},
+    "SUBAGENT": {"status": "PASS_WITH_SCOPE_LIMIT", "evidence": "prior native independent reviewer/subagent smoke retained outside release package"},
+    "REVIEW": {"status": "PASS_WITH_SCOPE_LIMIT", "evidence": "prior OCR frozen-input review and native risk-review smoke retained outside release package"},
+    "RECOVERY": {"status": "PASS", "evidence": "native PostCompact RESUME_OK plus Basic PowerContext exact-revision recall smoke"},
+    "ISOLATION": {"status": "PASS", "evidence": "project overlay ownership and clean-install isolation smoke"},
+    "PACKAGE_CLEAN_INSTALL": {"status": "PASS", "evidence": "reports/package-clean-install-3.1.0.json"},
+    "SCREENSHOT_NATIVE_ROUTE": {"status": "PASS_BY_CURRENT_DESKTOP_CAPABILITY", "scope": "Codex native image understanding; not third-party screenshot model generation"},
+    "SCREENSHOT_TO_CODE_PROVIDER": {"status": "OPTIONAL_NOT_CONFIGURED_FOR_MODEL_GENERATION"},
+    "POWERCONTEXT_FULL_MEMORY": {"status": "OPTIONAL_NOT_CONFIGURED"}
+  },
+  "release_blockers": [],
+  "boundaries": {
+    "no_full_powercontext_provider": true,
+    "third_party_screenshot_model_generation_not_configured": true,
+    "desktop_start_requires_opening_the_reported_repo_as_primary_folder": true,
+    "no_remote_publish_performed": true
+  }
+}

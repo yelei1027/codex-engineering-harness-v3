@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "harness_version": "3.0.0",
+  "harness_version": "3.1.0",
   "artifact_kind": "DESIGN_CONTRACT_NOT_RUNTIME_API",
   "description": "V3 正式文档的节点、触发、调用和分支契约。安装 Agent 需实现并验收；本文档结构验证不等于运行时能力验收。",
   "entry_node": "A00",

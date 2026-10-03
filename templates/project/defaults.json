@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "profile": "L2",
+  "initialize_on_start": true,
+  "hook_trust": "native_user_review",
+  "context": {
+    "warning_percent": 70,
+    "checkpoint_percent": 80,
+    "stop_new_work_percent": 90,
+    "handoff_after_compactions": 2,
+    "usage_source": "host_reported_or_user_supplied",
+    "same_task": "checkpoint_then_compact_then_verify",
+    "cross_session": "local_checkpoint_then_exact_powercontext_handoff"
+  },
+  "providers": {
+    "screenshot_to_code": "current_codex_session",
+    "task_memory": "codex_summary_with_powercontext_basic",
+    "powercontext_full_generation": "requires_separate_provider_configuration",
+    "oauth_token_export": false
+  }
+}

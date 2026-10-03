@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -9,10 +10,10 @@ import tarfile
 import tempfile
 import tomllib
 from pathlib import Path
-from . import review, workflow
+from . import context, memory, review, workflow
 from .inventory import endpoint_identity, inspect_registrations
-from .common import ROOT,HarnessError,atomic,canonical,git,lock,new_id,now,private_path,read_json,repo_root,run,sha,state_dir,write_json
-from .transaction import Transaction,image,rollback
+from .common import ROOT,HarnessError,atomic,canonical,git,lock,new_id,now,private_path,read_json,repo_root,run,safe_id,sha,state_dir,write_json
+from .transaction import Transaction,image,preflight_rollback,rollback
 
 BEGIN='# BEGIN CODEX ENGINEERING HARNESS V3'
 END='# END CODEX ENGINEERING HARNESS V3'
@@ -36,14 +37,105 @@ def machine_binding():
     binding=read_json(ROOT/'machine-binding.json',{})
     return binding
 
+def defaults():
+    return read_json(ROOT/'templates/project/defaults.json',{
+        'profile':'L2','initialize_on_start':True,'context':{'warning_percent':70,'checkpoint_percent':80,'stop_new_work_percent':90,'handoff_after_compactions':2}})
+
 def registry():
     return read_json(state_dir()/'projects.json',{})
 
 def project_binding(repo):
     value=read_json(repo/'.harness/state/project.json')
-    if not value or value.get('harness_root')!=str(ROOT):
-        raise HarnessError('Project is not enabled for this Harness root')
+    if not value:
+        raise HarnessError(f'Project is not enabled: {repo}. Run harness init "{repo}" --profile L2 for planning hooks, or harness enable "{repo}" for L1')
+    if value.get('harness_root')!=str(ROOT):
+        raise HarnessError(f'Project belongs to another Harness root: {value.get("harness_root")}; current root: {ROOT}. Use its original launcher or explicitly migrate the project')
     return value
+
+def select_project(value):
+    path=Path(value).expanduser().resolve()
+    if not path.is_dir():raise HarnessError('Project directory does not exist: '+str(path))
+    result=run(['git','-C',path,'rev-parse','--show-toplevel'],ok=False)
+    if result.returncode:raise HarnessError(f'Project has no Git working tree: {path}. Run harness init "{path}" first')
+    return repo_root(result.stdout.decode().strip())
+
+def initialize_project(value,profile):
+    path=Path(value).expanduser().resolve()
+    if not path.is_dir():raise HarnessError('Project directory does not exist: '+str(path))
+    probe=run(['git','-C',path,'rev-parse','--show-toplevel'],ok=False)
+    initialized=False
+    if probe.returncode==0:
+        repo=select_project(path)
+    else:
+        bare=run(['git','-C',path,'rev-parse','--is-bare-repository'],ok=False)
+        if bare.returncode==0 and bare.stdout.strip()==b'true':
+            raise HarnessError('Choose a Git working tree instead of a bare repository')
+        if path==Path.home().resolve() or path==Path(path.anchor):
+            raise HarnessError('Choose a project folder instead of the home directory or filesystem root')
+        if (path/'.git').exists() or (path/'.git').is_symlink():
+            raise HarnessError('Existing .git metadata cannot be resolved; preserve it and inspect Git configuration')
+        for directory,dirs,files in os.walk(path,followlinks=False):
+            if '.git' in dirs or '.git' in files:
+                raise HarnessError('Folder contains a Git repository; select that project instead: '+str(Path(directory)))
+        run(['git','-C',path,'init','--quiet']);initialized=True
+        repo=repo_root(path)
+    try:result=enable(repo,profile)
+    except HarnessError as error:
+        if initialized:raise HarnessError(str(error)+'; Git was initialized and preserved; reconcile configuration then retry') from error
+        raise
+    return {**result,'git':'INITIALIZED' if initialized else 'EXISTING','git_commit':'NOT_CREATED','remote':'UNCHANGED',
+            'memory':memory.try_bind(repo)}
+
+def refresh(repo,profile=None):
+    doc=project_binding(repo)
+    if doc['harness_root']!=str(ROOT):raise HarnessError('Use the project-owned Harness root for refresh')
+    old=disable(repo)
+    try:new=enable(repo,profile or doc['profile'])
+    except BaseException:
+        rollback(old['transaction_id']);raise
+    refresh_id=new_id('refresh')
+    record={'id':refresh_id,'status':'COMMITTED','repo':str(repo),'created':now(),
+            'disable_transaction':old['transaction_id'],'enable_transaction':new['transaction_id']}
+    write_json(state_dir()/'refreshes'/f'{refresh_id}.json',record)
+    return {**new,'transaction_id':refresh_id,'enable_transaction_id':new['transaction_id'],
+            'disable_transaction_id':old['transaction_id'],'memory':memory.try_bind(repo)}
+
+def rollback_operation(txid):
+    txid=safe_id(txid)
+    path=state_dir()/'refreshes'/f'{txid}.json'
+    composite=read_json(path)
+    if not composite:return rollback(txid)
+    if composite.get('status')=='ROLLED_BACK':
+        return {'transaction_id':txid,'status':'ALREADY_ROLLED_BACK','kind':'REFRESH'}
+    try:
+        # Validate the two-step restoration as one virtual transaction before
+        # either journal writes. A conflict in the old binding must not leave
+        # the project half-rolled-back/disabled.
+        virtual=preflight_rollback(composite['enable_transaction'])
+        preflight_rollback(composite['disable_transaction'],virtual)
+        first=rollback(composite['enable_transaction'])
+        second=rollback(composite['disable_transaction'])
+    except BaseException as error:
+        composite.update(status='ROLLBACK_PARTIAL',error=str(error),updated=now());write_json(path,composite)
+        raise
+    composite.update(status='ROLLED_BACK',rolled_back=now());write_json(path,composite)
+    return {'transaction_id':txid,'status':'ROLLED_BACK','kind':'REFRESH',
+            'enable_rollback':first['status'],'disable_rollback':second['status']}
+
+def start_project(value,profile=None):
+    path=Path(value).expanduser().resolve()
+    if not path.is_dir():raise HarnessError('Project directory does not exist: '+str(path))
+    probe=run(['git','-C',path,'rev-parse','--show-toplevel'],ok=False)
+    repo=select_project(path) if probe.returncode==0 else path
+    if not (repo/'.harness/state/project.json').exists():
+        if not defaults().get('initialize_on_start',True):
+            raise HarnessError('Automatic initialization is disabled; run harness init for this project')
+        with lock(state_dir()/'operation.lock'):
+            result=initialize_project(repo,profile or defaults()['profile'])
+        print(json.dumps(result,ensure_ascii=False),file=sys.stderr,flush=True)
+        repo=Path(result['repo'])
+    doc=project_binding(repo);verify_owned(registry().get(str(repo),{}))
+    return repo,doc
 
 def strip_block(text):
     if text.count(BEGIN)!=text.count(END) or text.count(BEGIN)>1:
@@ -138,11 +230,14 @@ def enable(repo,profile):
             raise HarnessError('PWF already registered in global hooks')
         origin=ROOT/'vendor/planning-with-files/hooks/codex-hooks.json'
         if not origin.exists():raise HarnessError('Locked PWF Codex hooks unavailable')
-        body=origin.read_text().replace('${PLUGIN_ROOT}',str(origin.parents[1]))
-        json.loads(body)
-        plans.append((hooks,body.encode(),None))
-    doc={'harness_root':str(ROOT),'version':(ROOT/'VERSION').read_text().strip(),'release_hash':release_hash(),'profile':profile,'codex_binary':codex_path,'enabled':now()}
-    plans += [(repo/'harness.yaml',f'version: 3.0.0\nprofile: {profile}\n'.encode(),None),
+        hook_doc=json.loads(origin.read_text().replace('${PLUGIN_ROOT}',str(origin.parents[1])))
+        command='python3 '+shlex.quote(str(ROOT/'scripts/context_hook.py'))
+        for event in ['PreCompact','PostCompact','SessionStart']:
+            hook_doc['hooks'].setdefault(event,[]).append({'matcher':'manual|auto' if event!='SessionStart' else 'startup|resume|compact',
+                'hooks':[{'type':'command','command':command,'timeout':30,'statusMessage':'Harness context checkpoint and recovery'}]})
+        plans.append((hooks,canonical(hook_doc)+b'\n',None))
+    doc={'harness_root':str(ROOT),'version':(ROOT/'VERSION').read_text().strip(),'release_hash':release_hash(),'profile':profile,'codex_binary':codex_path,'codex_launch_mode':machine_binding().get('codex_launch_mode','cli'),'enabled':now(),'defaults':defaults()}
+    plans += [(repo/'harness.yaml',f"version: {doc['version']}\nprofile: {profile}\n".encode(),None),
               (repo/'harness.lock',canonical({'version':doc['version'],'release_hash':doc['release_hash']})+b'\n',None),
               (repo/'.harness/state/project.json',canonical(doc)+b'\n',None)]
     with Transaction('Enable project '+key) as tx:
@@ -191,6 +286,29 @@ def static_check(root=None):
         if unknown:errors.append('Unknown contract edges: '+str(sorted(unknown)))
     return {'status':'PASS' if not missing and not errors else 'FAIL','missing':missing,'errors':errors,'release_hash':release_hash(root),'scope':'STATIC_STRUCTURE_ONLY'}
 
+def native_hook_status(repo,binary):
+    script=ROOT/'scripts/codex_inventory.py'
+    if not script.is_file():return {'status':'UNVERIFIED','reason':'codex_inventory.py unavailable'}
+    with tempfile.TemporaryDirectory() as directory:
+        output_path=Path(directory)/'inventory.json'
+        home=os.environ.get('CODEX_HOME',str(Path.home()/'.codex'))
+        try:p=run([sys.executable,str(script),'--binary',binary,'--home',home,'--output',str(output_path),str(repo)],ok=False,timeout=45)
+        except (OSError,subprocess.TimeoutExpired) as error:return {'status':'UNVERIFIED','reason':str(error)}
+        if p.returncode!=0 or not output_path.is_file():
+            return {'status':'UNVERIFIED','reason':'native hooks/list inventory failed','stderr':p.stderr.decode(errors='replace')[:1000]}
+        data=read_json(output_path,{})
+        entries=data.get('hooks',{}).get('data',[])
+        entry=next((item for item in entries if item.get('cwd')==str(repo)),{})
+        hooks=entry.get('hooks',[])
+        project=[item for item in hooks if item.get('source')=='project']
+        warnings=entry.get('warnings',[]);errors=entry.get('errors',[])
+        untrusted=[item.get('key') for item in project if item.get('trustStatus')!='trusted' or not item.get('enabled')]
+        status='FAIL' if errors else 'PASS' if project and not untrusted else 'PENDING_TRUST'
+        return {'status':status,'native_discovery':'FAIL' if errors else 'PASS','project_handlers':len(project),
+                'untrusted_or_disabled':untrusted,'warnings':warnings,'errors':errors,
+                'reason':'Native hooks/list returned load errors' if errors else 'Native hooks/list trust discovery completed',
+                'execution':'TRUST_DISCOVERY_ONLY; lifecycle execution requires separate smoke evidence'}
+
 def doctor(repo=None,deep=False):
     binding=machine_binding();groups={'STATIC':static_check(),'RUNTIME':{'status':'UNVERIFIED'},'TRIGGER':{'status':'UNVERIFIED','reason':'Requires fresh Codex session with actual skill selection'},
         'MCP':{'status':'UNVERIFIED'},'HOOKS':{'status':'NOT_REGISTERED'},'SUBAGENT':{'status':'UNVERIFIED'},'REVIEW':{'status':'UNVERIFIED'},'RECOVERY':{'status':'UNVERIFIED'},'ISOLATION':{'status':'UNVERIFIED'},'OPTIONAL_PROVIDERS':{'status':'UNVERIFIED'}}
@@ -214,6 +332,8 @@ def doctor(repo=None,deep=False):
                 results[name]={'status':'PASS' if p.returncode==0 else 'FAIL','command':argv,'returncode':p.returncode,'stdout':p.stdout.decode(errors='replace')[:1500],'stderr':p.stderr.decode(errors='replace')[:1000]}
             except (OSError,subprocess.TimeoutExpired) as e:results[name]={'status':'FAIL','error':str(e)}
         groups['MCP'].update(reason='Version commands do not verify MCP handshake/tool call',component_commands=results)
+        if repo and project_binding(repo)['profile']=='L2' and groups['HOOKS'].get('status')!='FAIL':
+            groups['HOOKS'].update(native_hook_status(repo,binary))
     # Real component smoke evidence is referenced separately; never turn static metadata into PASS.
     reports=sorted(str(p) for p in (ROOT/'reports').glob('*smoke*.json'))
     return {'status':'FAIL' if any(v.get('status')=='FAIL' for v in groups.values()) else 'UNVERIFIED','repo':str(repo) if repo else None,'categories':groups,'component_smoke_reports':reports,'scope':'CLI doctor does not perform provider generation, trigger or independent-agent tests'}
@@ -271,8 +391,8 @@ def package(destination):
     for p in sorted(ROOT.rglob('*')):
         relative=p.relative_to(ROOT)
         if any(private_path(Path(*relative.parts[:i])) for i in range(1,len(relative.parts)+1)):continue
-        if relative.parts[0] in {'state','data','.codex'}:continue
-        if relative.parts[0]=='reports' and str(relative) not in {'reports/acceptance-summary.json','reports/known-limitations.md'}:continue
+        if relative.parts[0] in {'state','data','.codex','.pytest_cache'}:continue
+        if relative.parts[0]=='reports' and str(relative) not in {'reports/acceptance-summary.json','reports/known-limitations.md','reports/package-clean-install-3.1.0.json','reports/final-mcp-runtime-smoke-3.1.0.json','reports/native-hook-lifecycle-3.1.0.json'}:continue
         if relative.parts[0]=='.agents' and str(relative)!='.agents/plugins/marketplace.json':continue
         if relative.parts[0]=='vendor':
             if len(relative.parts)<3:continue
@@ -331,15 +451,24 @@ def main():
     parser=argparse.ArgumentParser(description='Project-scoped Codex Engineering Harness V3; preserves unknown user configuration.')
     subs=parser.add_subparsers(dest='command',required=True)
     subs.add_parser('install',help='Register prepared locked control plane; idempotent')
-    for command in ['enable','disable','start','status','doctor']:
-        p=subs.add_parser(command);p.add_argument('repo',nargs='?' if command in {'status','doctor'} else None)
-        if command=='enable':p.add_argument('--profile',choices=['L0','L1','L2'],default='L1')
+    for command in ['init','enable','refresh','disable','start','status','doctor']:
+        p=subs.add_parser(command,help='Initialize Git if needed and enable the current project' if command=='init' else None)
+        optional=command in {'init','enable','refresh','start','status','doctor'}
+        p.add_argument('repo',nargs='?' if optional else None,default='.' if command in {'init','enable','refresh','start'} else None)
+        if command in {'init','enable','refresh'}:p.add_argument('--profile',choices=['L0','L1','L2'],default=None if command=='refresh' else defaults()['profile'])
         if command=='doctor':p.add_argument('--deep',action='store_true')
         if command=='start':p.add_argument('codex_args',nargs=argparse.REMAINDER)
     subs.add_parser('check',help='Read-only structural/release check')
+    subs.add_parser('defaults',help='Show initialization, context and provider defaults')
+    p=subs.add_parser('context',help='Checkpoint, verify and hand off task state independently of chat');s=p.add_subparsers(dest='context_command',required=True)
+    for command in ['status','checkpoint','verify','handoff','recall']:
+        q=s.add_parser(command);q.add_argument('repo',nargs='?',default='.')
+        if command=='status':q.add_argument('--used-percent',type=float);q.add_argument('--compactions',type=int,default=0)
+        else:q.add_argument('--task',required=True)
+        if command=='checkpoint':q.add_argument('--facts',required=True,help='Small JSON task summary; see harness-dev context reference');q.add_argument('--resume-node');q.add_argument('--session')
     p=subs.add_parser('update',help='Build/test isolated candidate, collect process acceptance and transactionally promote');p.add_argument('--to',required=True);p.add_argument('--promote',action='store_true');p.add_argument('--acceptance-plan');p.add_argument('--acceptance')
     p=subs.add_parser('rollback');p.add_argument('transaction_id')
-    p=subs.add_parser('package');p.add_argument('--output',default=str(ROOT/'dist/codex-engineering-harness-3.0.0.tar.gz'))
+    p=subs.add_parser('package');p.add_argument('--output',default=str(ROOT/'dist'/f"codex-engineering-harness-{(ROOT/'VERSION').read_text().strip()}.tar.gz"))
     subs.add_parser('uninstall',help='Remove accepted registration only; enabled projects must be disabled first; preserve source/dependencies/backups')
     p=subs.add_parser('freeze');p.add_argument('repo');p.add_argument('--task',required=True);p.add_argument('--base',required=True);p.add_argument('--spec');p.add_argument('--checks');p.add_argument('--allowlist',help='JSON array of authorized task paths; overrides baseline ownership exclusions')
     p=subs.add_parser('review-run');p.add_argument('repo');p.add_argument('--task',required=True);p.add_argument('--snapshot',required=True);p.add_argument('--kind',choices=['main','risk'],required=True);p.add_argument('reviewer_command',nargs='*')
@@ -352,21 +481,41 @@ def main():
         if command=='pause':q.add_argument('--resume',required=True);q.add_argument('--reason',required=True)
     args=parser.parse_args()
     try:
-        repo=repo_root(args.repo) if getattr(args,'repo',None) else None
         command=args.command
+        repo=None
+        if getattr(args,'repo',None) and command not in {'init','start'}:
+            repo=select_project(args.repo) if command in {'enable','refresh','context'} else repo_root(args.repo)
         if command=='start':
-            doc=project_binding(repo);verify_owned(registry().get(str(repo),{}))
-            argv=[doc['codex_binary'],*(args.codex_args[1:] if args.codex_args[:1]==['--'] else args.codex_args)]
-            os.chdir(repo);os.execve(argv[0],argv,session_environment())
-        if command in {'install','enable','disable','rollback','uninstall','update'}:
+            repo,doc=start_project(args.repo)
+            codex_args=args.codex_args[1:] if args.codex_args[:1]==['--'] else args.codex_args
+            launch_mode=doc.get('codex_launch_mode') or machine_binding().get('codex_launch_mode','cli')
+            if launch_mode=='desktop':
+                if codex_args:raise HarnessError('Desktop launch mode does not accept Codex CLI arguments; open the reported repo as the primary folder in Codex Desktop')
+                result={'status':'DESKTOP_PROJECT_READY','repo':str(repo),'profile':doc['profile'],'codex_binary':doc['codex_binary'],
+                        'action':'Open this repo as the primary folder in Codex Desktop and start a new chat; project Skills, MCP and trusted Hooks load from this repo scope',
+                        'automatic_gui_launch':'NOT_ATTEMPTED_NO_STABLE_PUBLIC_DESKTOP_CLI'}
+            else:
+                argv=[doc['codex_binary'],*codex_args]
+                os.chdir(repo);os.execve(argv[0],argv,session_environment())
+        if command in {'install','init','enable','refresh','disable','rollback','uninstall','update'}:
             with lock(state_dir()/'operation.lock'):
                 if command=='install':result=install()
+                elif command=='init':result=initialize_project(args.repo,args.profile)
                 elif command=='enable':result=enable(repo,args.profile)
+                elif command=='refresh':result=refresh(repo,args.profile)
                 elif command=='disable':result=disable(repo)
-                elif command=='rollback':result=rollback(args.transaction_id)
+                elif command=='rollback':result=rollback_operation(args.transaction_id)
                 elif command=='update':result=update(args.to,args.promote,args.acceptance_plan,args.acceptance)
                 else:result=uninstall()
         elif command=='check':result=static_check()
+        elif command=='defaults':result=defaults()
+        elif command=='context':
+            project_binding(repo)
+            if args.context_command=='status':result=context.guard(args.used_percent,args.compactions)
+            elif args.context_command=='checkpoint':result=context.checkpoint(repo,args.task,read_json(Path(args.facts)),args.resume_node,args.session)
+            elif args.context_command=='verify':result=context.verify(repo,args.task)
+            elif args.context_command=='handoff':result=context.handoff(repo,args.task)
+            else:result=memory.recall(repo,args.task)
         elif command=='status':result={'accepted':read_json(state_dir()/'accepted.json'),'projects':registry() if repo is None else registry().get(str(repo)), 'root':str(ROOT)}
         elif command=='doctor':result=doctor(repo,args.deep)
         elif command=='package':result=package(args.output)
@@ -380,7 +529,7 @@ def main():
             elif args.task_command=='resume':result=workflow.resume(repo,args.id)
             else:result=workflow.load(workflow.task_path(repo,args.id))
         output(result)
-        if result.get('status')=='FAIL':sys.exit(1)
+        if result.get('status') in {'FAIL','RESUME_CONFLICT','UNSYNCED'}:sys.exit(1)
     except (HarnessError,OSError,ValueError,subprocess.TimeoutExpired) as error:
         output({'status':'ERROR','error':str(error)})
         sys.exit(2)

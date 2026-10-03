@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "harness_version": "3.0.0",
+  "harness_version": "3.1.0",
   "registration_owner": "project binding chooses single plugin or standalone skills source, never both",
   "runtime_selection": "UNVERIFIED",
   "skills": [
@@ -455,7 +455,7 @@
         "compatibility"
       ],
       "upstream_frontmatter_removed": {
-        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint \u2014 delegation mode is LLM-free on the OCR side.\n"
+        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint — delegation mode is LLM-free on the OCR side.\n"
       },
       "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
       "behavior": {
@@ -469,9 +469,9 @@
       "name": "harness-dev",
       "component": "harness",
       "source": "local V3 contract",
-      "installed_sha256": "9d2922a9a4280029909352a4acfadb7f7c8e624c0e1e5ea4bee3fe546837e15c",
+      "installed_sha256": "a7e9a13f2fa8041bc6fa6bb15e2effd45da576a13fff73e186120dd034035cfb",
       "allow_implicit_invocation": true,
-      "runtime_selection": "BASE_ROUTER_REAL_NATIVE_PASS; CLI_BINDING_HINT_ADDED_AFTER_ACCEPTANCE"
+      "runtime_selection": "DEFAULT_L2_CONTEXT_PROVIDER_POLICY_CHANGED; native behavioral selection UNVERIFIED for this revision"
     },
     {
       "name": "harness-doctor",
@@ -485,9 +485,9 @@
       "name": "harness-maintain",
       "component": "harness",
       "source": "local V3 contract",
-      "installed_sha256": "a75f155fd20f57528210d28ae71402762f9c9b5bf08a96c0ceace78603d96ba9",
+      "installed_sha256": "9b84bfa58e9edbcf95a407eb85630de373462fc482852983fa15593fae6c82da",
       "allow_implicit_invocation": true,
-      "runtime_selection": "UNVERIFIED"
+      "runtime_selection": "DEFAULT_L2_CONTEXT_PROVIDER_POLICY_CHANGED; native behavioral selection UNVERIFIED for this revision"
     }
   ]
 }

@@ -83,6 +83,28 @@ class Transaction:
             self.save()
             rollback(self.id)
 
+def preflight_rollback(txid, virtual=None):
+    """Validate an entire rollback without writing; return simulated restored images."""
+    from .common import safe_id
+    path = state_dir()/'transactions'/safe_id(txid)/'journal.json'
+    doc = read_json(path)
+    if not doc:
+        raise HarnessError(f'Unknown transaction: {txid}')
+    states = dict(virtual or {})
+    if doc['status'] == 'ROLLED_BACK':
+        return states
+    for e in reversed(doc['touch_set']):
+        current = states.get(e['path'], image(Path(e['path'])))
+        if not e['applied'] and current == e['before']:
+            continue
+        if current != e['after']:
+            raise HarnessError(f'Rollback conflict; preserve later/user changes: {e["path"]}')
+        safe_parent(e['path'])
+        if e['before']['kind'] == 'file' and sha(Path(e['backup']).read_bytes()) != e['before']['sha256']:
+            raise HarnessError(f'Backup hash mismatch: {e["path"]}')
+        states[e['path']] = e['before']
+    return states
+
 def rollback(txid):
     from .common import safe_id
     path = state_dir()/'transactions'/safe_id(txid)/'journal.json'

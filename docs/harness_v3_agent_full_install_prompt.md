@@ -1,6 +1,6 @@
-# Codex Engineering Harness V3.0.0 — Agent 全套安装主指令
+# Codex Engineering Harness V3.1.0 — Agent 全套安装主指令
 
-你现在是 **Codex / Agent Harness 工程师、全栈工程师、DevOps 工程师和安全审计工程师**。你的任务是在当前机器上构建并验收一套 **Codex Engineering Harness V3.0.0**，最终做到：
+你现在是 **Codex / Agent Harness 工程师、全栈工程师、DevOps 工程师和安全审计工程师**。你的任务是在当前机器上构建并验收一套 **Codex Engineering Harness V3.1.0**，最终做到：
 
 - 一次安装、按项目启用；
 - 日常用户只描述需求，由 Main Router 自动选择 Skill / MCP / Subagent；
@@ -113,7 +113,7 @@ Subagent 不是 Skill。`reviewer`、`researcher` 等必须是真实子任务/�
 
 V3 默认：
 
-- planning-with-files：仅 L2/长任务启用；
+- planning-with-files：新项目默认使用 L2 安装 profile 并注册项目级 PWF Hook；任务风险仍独立按 L0/L1/L2 分类；显式选择 L1 时不注册这些 Hook；
 - context-mode：默认 **MCP-only**，不要默认启用其生命周期 Hooks；
 - PowerContext：MCP / 官方 Codex integration，用于正式 Handoff；
 - CodeGraph：MCP；
@@ -262,7 +262,7 @@ codex-engineering-harness/
 
 ```text
 codex-engineering-harness/
-├── VERSION                         # 3.0.0
+├── VERSION                         # 3.1.0
 ├── plugin.json                     # portable manifest（当前 schema 支持时）
 ├── .codex-plugin/plugin.json       # compatibility manifest（当前 Codex 需要时）
 ├── skills/
@@ -534,10 +534,13 @@ harness uninstall
 
 ### start
 
-- 解析真实 repo；
-- 验证已 enable；
-- 使用锁定/指定 Codex binary；
-- 从 repo root 启动新 Session；
+- 解析真实 repo；从子目录启动时回溯到现有 Git root；
+- 若当前目录尚未初始化且策略允许，首次 `start` 自动执行安全 `init + enable`，默认 profile=L2；
+- 初始化拒绝 HOME、文件系统根、包含嵌套仓库的集合目录和 bare/异常 `.git`；
+- 自动初始化不创建 commit、不创建 remote；enable 失败时保留用户文件与已创建 `.git`；
+- 使用锁定/指定 Codex binary，并记录 `codex_launch_mode=desktop|cli`；
+- Desktop bundled runtime 只用于 app-server / inventory / MCP 等运行时能力，不得冒充完整 TUI；此模式下 `harness start` 返回 `DESKTOP_PROJECT_READY` 和准确 repo，要求用户在 Codex Desktop 将该 repo 作为主文件夹并新建会话；
+- 只有已验证的完整 standalone CLI 才允许 `exec` 启动，并从 repo root 建立新 Session；
 - 不在错误目录旧 Session 内仅 `cd`。
 
 ### doctor

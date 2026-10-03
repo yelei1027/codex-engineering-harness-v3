@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from harness_core import cli,review,workflow
+from harness_core import cli,context,memory,review,workflow
 from harness_core.common import HarnessError, ROOT, read_json, sha, write_json
 from harness_core.transaction import Transaction, image, rollback
 
@@ -36,6 +36,8 @@ class HarnessCase(unittest.TestCase):
         (release/'skills/harness-dev/SKILL.md').write_text('---\nname: harness-dev\ndescription: test\n---\nRouter\n')
         (release/'templates/project').mkdir(parents=True)
         (release/'templates/project/AGENTS.harness.md').write_text('Read local router.\n')
+        (release/'vendor/planning-with-files/hooks').mkdir(parents=True)
+        shutil.copyfile(ROOT/'vendor/planning-with-files/hooks/codex-hooks.json',release/'vendor/planning-with-files/hooks/codex-hooks.json')
         (release/'contracts').mkdir()
         shutil.copyfile(CONTRACT,release/'contracts/workflow.json')
         write_json(release/'machine-binding.json',{'codex_binary':'/bin/echo','mcp_servers':{'test':{'command':'/bin/echo','args':['hello']}}})
@@ -310,7 +312,7 @@ class HarnessCase(unittest.TestCase):
             with self.assertRaises(HarnessError):cli.mcp_fragment('[mcp_servers.other]\nurl="http://localhost:9000/mcp/"\n')
 
     def test_l2_hook_registered_pending_trust(self):
-        release=self.fake_release();hook=release/'vendor/planning-with-files/hooks/codex-hooks.json';hook.parent.mkdir(parents=True)
+        release=self.fake_release();hook=release/'vendor/planning-with-files/hooks/codex-hooks.json';hook.parent.mkdir(parents=True,exist_ok=True)
         write_json(hook,{'hooks':{'SessionStart':[{'hooks':[{'command':'${PLUGIN_ROOT}/scripts/start'}]}]}})
         with patch.object(cli,'ROOT',release):
             result=cli.enable(self.repo,'L2');self.assertEqual(result['hooks'],'PENDING_TRUST')
@@ -485,5 +487,283 @@ class HarnessCase(unittest.TestCase):
         self.assertEqual(result['ocr'],str(ocr));self.assertEqual(result['cwd'],str(self.repo))
         self.assertTrue(result['PATH'].startswith('/usr/bin:/bin:'))
         self.assertEqual(os.environ.get('PATH'),parent_path)
+
+    def test_start_desktop_mode_reports_project_ready_without_exec(self):
+        import sys
+        release=self.fake_release()
+        binding=read_json(release/'machine-binding.json');binding['codex_launch_mode']='desktop';write_json(release/'machine-binding.json',binding)
+        with patch.object(cli,'ROOT',release):cli.enable(self.repo,'L1')
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'start',str(self.repo)],capture_output=True)
+        self.assertEqual(process.returncode,0,process.stderr.decode()+process.stdout.decode())
+        result=json.loads(process.stdout)
+        self.assertEqual(result['status'],'DESKTOP_PROJECT_READY')
+        self.assertEqual(result['repo'],str(self.repo))
+        self.assertEqual(result['profile'],'L1')
+        self.assertIn('primary folder',result['action'])
+        self.assertEqual(result['automatic_gui_launch'],'NOT_ATTEMPTED_NO_STABLE_PUBLIC_DESKTOP_CLI')
+
+    def test_init_new_project_preserves_files_and_creates_no_commit(self):
+        release=self.fake_release();project=self.base/'new-project';project.mkdir()
+        (project/'README.md').write_text('user content\n')
+        with patch.object(cli,'ROOT',release):
+            result=cli.initialize_project(project,'L1')
+            self.assertEqual(result['git'],'INITIALIZED')
+            self.assertEqual(cli.initialize_project(project,'L1')['status'],'ALREADY_ENABLED')
+        self.assertEqual((project/'README.md').read_text(),'user content\n')
+        self.assertTrue((project/'.git').is_dir())
+        self.assertEqual(subprocess.run(['git','-C',str(project),'rev-parse','--verify','HEAD'],capture_output=True).returncode,128)
+        self.assertEqual(subprocess.check_output(['git','-C',str(project),'remote']).strip(),b'')
+
+    def test_init_subdirectory_uses_existing_root(self):
+        release=self.fake_release();child=self.repo/'src';child.mkdir()
+        with patch.object(cli,'ROOT',release):result=cli.initialize_project(child,'L1')
+        self.assertEqual(result['repo'],str(self.repo))
+        self.assertEqual(result['git'],'EXISTING')
+        self.assertFalse((child/'.git').exists())
+        self.assertEqual(self.git('rev-parse','HEAD').strip(),self.original)
+
+    def test_init_refuses_home_and_nested_repositories(self):
+        parent=self.base/'collection';parent.mkdir();child=parent/'existing';child.mkdir()
+        subprocess.check_call(['git','-C',str(child),'init','-q'])
+        with self.assertRaisesRegex(HarnessError,'contains a Git repository'):cli.initialize_project(parent,'L1')
+        self.assertFalse((parent/'.git').exists())
+        with patch('pathlib.Path.home',return_value=self.base),self.assertRaisesRegex(HarnessError,'home directory'):
+            cli.initialize_project(self.base,'L1')
+        self.assertFalse((self.base/'.git').exists())
+
+    def test_init_preserves_bare_repository_and_failed_enablement(self):
+        bare=self.base/'bare';subprocess.check_call(['git','init','--bare','-q',str(bare)])
+        with self.assertRaisesRegex(HarnessError,'bare repository'):cli.initialize_project(bare,'L1')
+        self.assertFalse((bare/'.git').exists())
+        release=self.fake_release();project=self.base/'conflict';project.mkdir()
+        (project/'harness.yaml').write_text('user configuration')
+        with patch.object(cli,'ROOT',release),self.assertRaisesRegex(HarnessError,'Git was initialized and preserved'):
+            cli.initialize_project(project,'L1')
+        self.assertTrue((project/'.git').is_dir())
+        self.assertEqual((project/'harness.yaml').read_text(),'user configuration')
+        self.assertFalse((project/'AGENTS.md').exists())
+
+    def test_cli_init_enable_and_start_default_to_current_project(self):
+        import sys
+        release=self.fake_release();project=self.base/'current-project';project.mkdir()
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'init'],cwd=project,capture_output=True)
+        self.assertEqual(process.returncode,0,process.stdout.decode()+process.stderr.decode())
+        self.assertEqual(json.loads(process.stdout)['repo'],str(project))
+        child=project/'src';child.mkdir()
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'enable'],cwd=child,capture_output=True)
+        self.assertEqual(json.loads(process.stdout)['status'],'ALREADY_ENABLED')
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'start'],cwd=child,capture_output=True)
+        self.assertEqual(process.returncode,0,process.stdout.decode()+process.stderr.decode())
+
+    def test_start_missing_binding_explains_enable_command(self):
+        with self.assertRaisesRegex(HarnessError,'harness init'):
+            cli.project_binding(self.repo)
+
+    def test_new_git_repository_supports_task_and_review_without_commit(self):
+        from harness_core.common import repo_root
+        project=self.base/'unborn';project.mkdir();subprocess.check_call(['git','-C',str(project),'init','-q'])
+        self.assertEqual(repo_root(project),project)
+        (project/'README.md').write_text('preexisting\n')
+        state=workflow.create(project,'first-task','L1','development')
+        (project/'new.py').write_text('answer=42\n')
+        subprocess.check_call(['git','-C',str(project),'add','new.py'])
+        result=review.freeze(project,'first-task',state['baseline_head'])
+        target=read_json(Path(result['path'])/'target.json')
+        self.assertEqual(target['reviewable_paths'],['new.py'])
+        self.assertFalse(review.review_status(project,'first-task',result['snapshot_id'])['stale'])
+        subprocess.check_call(['git','-C',str(project),'-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','first commit'])
+        self.assertEqual(review.review_status(project,'first-task',result['snapshot_id'])['revision_evidence'],'SHA_OR_INDEX_CHANGED_CONTENT_EQUIVALENT')
+        next_snapshot=review.freeze(project,'first-task',state['baseline_head'])
+        self.assertEqual(read_json(Path(next_snapshot['path'])/'target.json')['reviewable_paths'],['new.py'])
+        (project/'new.py').write_text('answer=43\n')
+        self.assertTrue(review.review_status(project,'first-task',result['snapshot_id'])['stale'])
+
+    def task_facts(self):
+        return {'objective':'Implement a CSV validation rule','completed':['Acceptance identified'],
+                'remaining':['Implement validation'],'blockers':[],'decisions':['Preserve input rows'],
+                'next_action':'Write one failing integration test','spec_refs':['spec.md'],
+                'tests':[{'command':['python3','-m','unittest'],'exit_code':0}],
+                'review':{'status':'UNVERIFIED'},'workers':[]}
+
+    def context_task(self):
+        (self.repo/'spec.md').write_text('Approved CSV validation spec\n')
+        workflow.create(self.repo,'ctx','L1','development')
+        workflow.transition(self.repo,'ctx','D00','classify')
+        workflow.transition(self.repo,'ctx','A01','development')
+
+    def test_context_checkpoint_detects_code_spec_branch_and_workflow_drift(self):
+        self.context_task();facts=self.task_facts()
+        context.checkpoint(self.repo,'ctx',facts)
+        self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+        (self.repo/'spec.md').write_text('Changed spec\n')
+        self.assertIn('SPEC_REFS_CHANGED',context.verify(self.repo,'ctx')['conflicts'])
+        context.checkpoint(self.repo,'ctx',facts)
+        self.git('checkout','-qb','different-branch')
+        self.assertIn('BRANCH_CHANGED',context.verify(self.repo,'ctx')['conflicts'])
+        context.checkpoint(self.repo,'ctx',facts)
+        workflow.transition(self.repo,'ctx','D01','verify repository')
+        self.assertIn('WORKFLOW_CHANGED',context.verify(self.repo,'ctx')['conflicts'])
+
+    def test_context_precompact_never_reuses_stale_facts_or_creates_remote_handoff(self):
+        self.context_task();facts=self.task_facts()
+        context.checkpoint(self.repo,'ctx',facts)
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_READY')
+        (self.repo/'source.py').write_text('print(2)\n')
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        self.assertIn('AGENT_SUMMARY_REQUIRED',context.verify(self.repo,'ctx')['conflicts'])
+        self.assertFalse((self.repo/'.harness/task/ctx/powercontext-handoff.json').exists())
+
+    def test_precompact_does_not_resign_tampered_checkpoint_facts(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        path=self.repo/'.harness/task/ctx/context-checkpoint.json'
+        doc=read_json(path);doc['facts']['next_action']='tampered stale instruction';write_json(path,doc)
+        result=context.checkpoint(self.repo,'ctx',reason='precompact')
+        self.assertEqual(result['status'],'CHECKPOINT_PARTIAL')
+        clean=context.load_checkpoint(self.repo,'ctx')
+        self.assertIsNone(clean['facts'])
+        self.assertEqual(clean['facts_status'],'AGENT_SUMMARY_REQUIRED')
+
+    def test_checkpoint_rejects_secret_invalid_result_and_symlink(self):
+        self.context_task();facts=self.task_facts();facts['next_action']='OPENAI_API_KEY=TEST_SECRET_DO_NOT_USE_1234567890'
+        with self.assertRaisesRegex(HarnessError,'credentials'):context.checkpoint(self.repo,'ctx',facts)
+        facts=self.task_facts();facts['tests'][0]['exit_code']='passed'
+        with self.assertRaises(HarnessError):context.checkpoint(self.repo,'ctx',facts)
+        outside=self.base/'outside';outside.write_text('preserve')
+        (self.repo/'.harness/task/ctx/context-checkpoint.json').symlink_to(outside)
+        with self.assertRaisesRegex(HarnessError,'symlink'):context.checkpoint(self.repo,'ctx',self.task_facts())
+        self.assertEqual(outside.read_text(),'preserve')
+
+    def test_checkpoint_tampering_and_ambiguous_task_are_not_restored(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts(),session='session-1')
+        workflow.create(self.repo,'other','L1','development')
+        with self.assertRaises(HarnessError):context.choose_task(self.repo)
+        self.assertEqual(context.choose_task(self.repo,session='session-1'),'ctx')
+        p=self.repo/'.harness/task/ctx/context-checkpoint.json';doc=read_json(p);doc['resume_node']='T03';write_json(p,doc)
+        with self.assertRaisesRegex(HarnessError,'modified'):context.verify(self.repo,'ctx')
+
+    def test_guard_reports_only_supplied_usage_and_configured_thresholds(self):
+        self.assertEqual(context.guard()['status'],'USAGE_UNKNOWN')
+        for percent,status in [(69,'NORMAL'),(70,'WARNING_CONTEXT_HIGH'),(80,'CHECKPOINT_REQUIRED'),(90,'STOP_NEW_WORK')]:
+            self.assertEqual(context.guard(percent)['status'],status)
+        self.assertTrue(context.guard(75,2)['handoff_recommended'])
+        for value in [-1,101,float('nan')]:
+            with self.assertRaises(HarnessError):context.guard(value)
+
+    def test_powercontext_binding_is_project_scoped_and_handoff_is_exact_and_idempotent(self):
+        release=self.fake_release();write_json(release/'services-binding.json',{'service_urls':{'powercontext':'http://127.0.0.1:18080'}})
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        calls=[]
+        def remote(url,path,payload=None):
+            calls.append((path,payload))
+            if path=='/health/ready':return {'status':'ready'}
+            if path=='/v1/scopes':return {'scope_id':'scope-1'}
+            if path.endswith('prepare-current'):return {'handoff':payload['handoff']}
+            if path.endswith('/commit'):return {'reference':{'artifact_id':'real-artifact','revision':'real-revision'}}
+            return {'status':'resolved','scope_id':'scope-1','selected_revision':{'artifact_id':'real-artifact','revision':'real-revision'}}
+        with patch.object(cli,'ROOT',release),patch.object(memory,'request',side_effect=remote):
+            first=context.handoff(self.repo,'ctx')
+            context.checkpoint(self.repo,'ctx',self.task_facts())
+            second=context.handoff(self.repo,'ctx')
+            self.assertEqual(first['status'],'SYNCED');self.assertEqual(second['status'],'ALREADY_SYNCED')
+            self.assertEqual(memory.recall(self.repo,'ctx')['status'],'RECALLED')
+        self.assertEqual(sum(p=='/v1/handoff/commit' for p,_ in calls),1)
+        self.assertEqual(calls[-1][1]['selection'],'exact')
+        self.assertNotIn('source.py',json.dumps(calls))
+
+    def test_memory_rejects_wrong_revision_and_changed_server_binding(self):
+        release=self.fake_release();write_json(release/'services-binding.json',{'service_urls':{'powercontext':'http://127.0.0.1:18080'}})
+        p=self.repo/'.harness/state/memory.json';write_json(p,{'repo':str(self.repo),'scope_id':'scope-1','url':'https://external.invalid'})
+        with patch.object(cli,'ROOT',release),self.assertRaisesRegex(HarnessError,'loopback'):memory.bind(self.repo)
+        write_json(p,{'repo':str(self.repo),'scope_id':'scope-1','url':'http://127.0.0.1:18080'})
+        write_json(self.repo/'.harness/task/ctx/powercontext-handoff.json',{'repo':str(self.repo),'scope_id':'scope-1','url':'http://127.0.0.1:18080','revision':{'artifact_id':'handoff','revision':1}})
+        with patch.object(cli,'ROOT',release),patch.object(memory,'request',return_value={'status':'resolved','scope_id':'scope-1','selected_revision':{'artifact_id':'handoff','revision':2}}),self.assertRaisesRegex(HarnessError,'conflicting'):
+            memory.recall(self.repo,'ctx')
+
+    def test_powercontext_failure_preserves_local_checkpoint_and_never_reads_login(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        login=self.base/'codex/auth.json';login.parent.mkdir(exist_ok=True);login.write_text('invalid credential sentinel')
+        with patch.object(memory,'bind',side_effect=HarnessError('service unavailable')):
+            self.assertEqual(context.handoff(self.repo,'ctx')['status'],'UNSYNCED')
+        self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+        facts=self.task_facts();facts['workers']=[{'id':'child-real','status':'running'}]
+        context.checkpoint(self.repo,'ctx',facts)
+        with self.assertRaisesRegex(HarnessError,'workers'):memory.handoff(self.repo,context.load_checkpoint(self.repo,'ctx'))
+
+    def test_start_automatically_initializes_new_project_with_l2(self):
+        import sys
+        release=self.fake_release();project=self.base/'auto-start';project.mkdir()
+        (project/'user.txt').write_text('original')
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'start'],cwd=project,capture_output=True)
+        self.assertEqual(process.returncode,0,process.stderr.decode())
+        binding=read_json(project/'.harness/state/project.json')
+        self.assertEqual(binding['profile'],'L2');self.assertEqual((project/'user.txt').read_text(),'original')
+        events=read_json(project/'.codex/hooks.json')['hooks']
+        self.assertIn('PostCompact',events)
+        self.assertEqual(sum('context_hook.py' in h['command'] for g in events['PreCompact'] for h in g['hooks']),1)
+        self.assertFalse((project/'.harness/state/memory.json').exists())
+
+    def test_refresh_preserves_unmanaged_config_and_rolls_back_failed_enablement(self):
+        release=self.fake_release()
+        with patch.object(cli,'ROOT',release):
+            cli.enable(self.repo,'L1')
+            agents=self.repo/'AGENTS.md';agents.write_text(agents.read_text()+'User added rule\n')
+            result=cli.refresh(self.repo)
+            self.assertEqual(result['profile'],'L1');self.assertIn('User added rule',agents.read_text())
+            before=agents.read_bytes()
+            with patch.object(cli,'enable',side_effect=HarnessError('candidate fails')),self.assertRaises(HarnessError):cli.refresh(self.repo)
+            self.assertEqual(agents.read_bytes(),before)
+            self.assertEqual(cli.project_binding(self.repo)['profile'],'L1')
+
+    def test_refresh_returned_transaction_restores_previous_binding(self):
+        release=self.fake_release()
+        with patch.object(cli,'ROOT',release):
+            first=cli.enable(self.repo,'L1')
+            paths=[self.repo/'AGENTS.md',self.repo/'.codex/config.toml',self.repo/'harness.lock',self.repo/'.harness/state/project.json']
+            before={str(path):path.read_bytes() for path in paths}
+            old_registry=json.loads(json.dumps(cli.registry()))
+            result=cli.refresh(self.repo)
+            self.assertTrue(result['transaction_id'].startswith('refresh-'))
+            rolled=cli.rollback_operation(result['transaction_id'])
+            self.assertEqual(rolled['status'],'ROLLED_BACK')
+            self.assertEqual({str(path):path.read_bytes() for path in paths},before)
+            self.assertEqual(cli.registry(),old_registry)
+            self.assertEqual(cli.rollback_operation(result['transaction_id'])['status'],'ALREADY_ROLLED_BACK')
+
+    def test_native_hook_status_fails_on_runtime_load_errors(self):
+        release=self.fake_release();scripts=release/'scripts';scripts.mkdir(exist_ok=True)
+        (scripts/'codex_inventory.py').write_text('fixture')
+        def fake_run(argv,**kwargs):
+            out=Path(argv[argv.index('--output')+1])
+            write_json(out,{'hooks':{'data':[{'cwd':str(self.repo),'hooks':[{
+                'source':'project','key':'project-hook','trustStatus':'trusted','enabled':True
+            }],'warnings':[],'errors':['invalid hook definition']}]}})
+            return subprocess.CompletedProcess(argv,0,b'',b'')
+        with patch.object(cli,'ROOT',release),patch.object(cli,'run',side_effect=fake_run):
+            result=cli.native_hook_status(self.repo,'/bin/echo')
+        self.assertEqual(result['status'],'FAIL')
+        self.assertEqual(result['native_discovery'],'FAIL')
+        self.assertIn('invalid hook definition',result['errors'])
+
+    def test_postcompact_without_task_continues_but_ambiguous_task_stops(self):
+        import importlib.util
+        path=ROOT/'scripts/context_hook.py'
+        spec=importlib.util.spec_from_file_location('harness_context_hook_test',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        payload={'cwd':str(self.repo),'hook_event_name':'PostCompact','session_id':'session-test'}
+        with patch.object(module.cli,'select_project',return_value=self.repo),patch.object(module.cli,'project_binding',return_value={}):
+            with patch.object(module.context,'choose_task',side_effect=HarnessError('No active Harness task for this session')):
+                self.assertTrue(module.handle(payload)['continue'])
+            with patch.object(module.context,'choose_task',side_effect=HarnessError('Choose --task explicitly; multiple active Harness tasks exist for this session')):
+                self.assertFalse(module.handle(payload)['continue'])
+
+    def test_empty_tree_and_fingerprint_do_not_write_git_objects(self):
+        from harness_core.common import empty_tree
+        def objects():
+            root=self.repo/'.git/objects'
+            return {str(p.relative_to(root)):p.stat().st_size for p in root.rglob('*') if p.is_file()}
+        before=objects()
+        self.assertTrue(empty_tree(self.repo))
+        review.fingerprint(self.repo,self.original)
+        self.assertEqual(objects(),before)
 
 if __name__=='__main__':unittest.main()

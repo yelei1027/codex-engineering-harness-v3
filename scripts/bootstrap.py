@@ -34,7 +34,14 @@ def main():
     if not Path(binary).is_file():
         raise SystemExit('Set HARNESS_CODEX_BINARY to your installed Codex binary.')
     node = ROOT/'runtimes/node/node_modules'
-    binding = {'codex_binary': binary, 'mcp_servers': {
+    launch_mode = os.environ.get('HARNESS_CODEX_LAUNCH_MODE')
+    if launch_mode is None:
+        launch_mode = 'desktop' if Path(binary).resolve() == Path('/usr/lib/chatgpt/resources/codex') else 'cli'
+    if launch_mode not in {'desktop','cli'}:
+        raise SystemExit('HARNESS_CODEX_LAUNCH_MODE must be desktop or cli.')
+    version_text = subprocess.check_output([binary, '--version'], text=True).strip()
+    codex_version = version_text.rsplit(' ', 1)[-1]
+    binding = {'codex_binary': binary, 'codex_version': codex_version, 'codex_launch_mode': launch_mode, 'mcp_servers': {
         'context-mode': {'command': shutil.which('node'), 'args': [str(node/'context-mode/server.bundle.mjs')],
                          'env': {'CONTEXT_MODE_DIR': str(ROOT/'private/context-mode')}},
         'codegraph': {'command': str(node/'.bin/codegraph'), 'args': ['serve', '--mcp'], 'env': {'CODEGRAPH_TELEMETRY': '0'}},

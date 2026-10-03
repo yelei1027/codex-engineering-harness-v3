@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "version": "3.1.0",
+  "validated_archive_sha256": "91d591526c2e9c2ea3f060abb113249ee2431ce4a8a1b74d515aa47f875ff193",
+  "source_release_hash": "31006253db5654f14ab7c7460123da7b0b3c2e9362240e8618ff10265de6f2e2",
+  "environment": {
+    "source": "fresh archive extraction",
+    "home": "/tmp/harness-v31-final-home",
+    "project": "/tmp/harness-v31-final-project",
+    "profile": "L1"
+  },
+  "checks": {
+    "archive_version": "PASS",
+    "bootstrap_locked_dependencies": "PASS",
+    "install": "PASS",
+    "install_idempotence": "PASS",
+    "init_without_commit_or_remote": "PASS",
+    "desktop_start_mode": "PASS",
+    "doctor_static_runtime_isolation": "PASS",
+    "disable": "PASS",
+    "uninstall": "PASS",
+    "reinstall": "PASS",
+    "forbidden_archive_names": "PASS",
+    "cache_exclusion": "PASS"
+  },
+  "note": "This clean-install validated the exact source release hash. A metadata-only repack may have a different archive SHA256; the final archive is rechecked after repack without rewriting this report."
+}

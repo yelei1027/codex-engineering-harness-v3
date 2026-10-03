@@ -1,6 +1,6 @@
 {
   "codex_binary": "/usr/lib/chatgpt/resources/codex",
-  "codex_version": "0.159.2",
+  "codex_version": "0.160.0",
   "older_path_binary": "/snap/codex/34/bin/codex 0.114.0",
   "plugin_format": "portable with Codex compatibility manifest; lean staging root",
   "registration": "project skills and project config MCP; catalog plugin installation is an alternative, never simultaneous skill registration",

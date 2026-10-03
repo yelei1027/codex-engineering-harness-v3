@@ -1,0 +1,89 @@
+{
+  "status": "PASS",
+  "thread_id": "01a100da-20fa-7b92-831e-c6f42c4d76c4",
+  "results": [
+    {
+      "server": "context-mode",
+      "tool": "ctx_execute",
+      "status": "PASS",
+      "response": {
+        "id": 10,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "```javascript\nconsole.log(\"harness-final-mcp-ok\")\n```\n\nharness-final-mcp-ok\n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": "codegraph",
+      "tool": "codegraph_explore",
+      "status": "PASS",
+      "response": {
+        "id": 11,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "**Exploration: normalize_sku import_row**\n\nFound 5 symbols across 2 files.\n\n**Blast radius — what depends on these (update/verify before editing)**\n\n- `normalize_sku` (service.py:1) — 1 caller in `service.py`; no tests found within 3 caller hops\n- `import_row` (service.py:4) — 1 caller in `service.py`; no tests found within 3 caller hops\n\n**Source Code**\n\n> The code below is the **verbatim, current on-disk source** of these files — re-read from disk on this call and line-numbered, byte-for-byte identical to what the Read tool returns. It is NOT a summary, outline, or stale cache. Treat each block as a Read you have already performed: do not Read a file shown here.\n\n**`service.py`** — normalize_sku(function), import_row(function), has_duplicate(function), graph_live_update_probe(function)\n\n```python\n1\tdef normalize_sku(value):\n2\t    return value.strip().upper()\n3\t\n4\tdef import_row(row):\n5\t    return normalize_sku(row[\"sku\"])\n6\t\n7\tdef has_duplicate(rows):\n8\t    return len(rows) != len(set(rows))\n9\t\n10\tdef graph_live_update_probe(row):\n11\t    return import_row(row)\n```\n\n**`new_module.py`** — import_csv(function)\n\n```python\n1\tdef import_csv(text):\n2\t    return text.splitlines()\n```\n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "server": "markitdown",
+      "tool": "convert_to_markdown",
+      "status": "PASS",
+      "response": {
+        "id": 12,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "# Harness smoke\n\nSKU duplicate validation"
+            }
+          ],
+          "structuredContent": {
+            "result": "# Harness smoke\n\nSKU duplicate validation"
+          },
+          "isError": false
+        }
+      }
+    },
+    {
+      "server": "powercontext",
+      "tool": "list_scopes",
+      "status": "PASS",
+      "response": {
+        "id": 13,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"items\":[{\"scope_id\":\"scp_0p8p0360aya1dwm4aks4azt7e2\",\"title\":\"Harness service validation\",\"summary\":\"Isolated installation smoke fixtures\",\"parent_scope_id\":null,\"context_references\":[],\"external_references\":[],\"version\":1}],\"next_cursor\":\"eyJhZnRlciI6InNjcF8wcDhwMDM2MGF5YTFkd200YWtzNGF6dDdlMiIsImNvbnRleHRfZGlnZXN0IjoiN2Y4N2RjNWNlYTExODkwZTM3YWU4NjM4MGY3MjI2NmJhODc0YzRmMmExNGUwNGY1NTFmM2NjNTVlMGMxNDVkZiIsImV4cGlyZXNfYXQiOjE3OTEwMTkyNTgsInZlcnNpb24iOjN9.TxsTC8aMtDi0gwsks7g3JETpUjqeWQk0A7SCCPSAZBQ\"}"
+            }
+          ],
+          "structuredContent": {
+            "items": [
+              {
+                "scope_id": "scp_0p8p0360aya1dwm4aks4azt7e2",
+                "title": "Harness service validation",
+                "summary": "Isolated installation smoke fixtures",
+                "parent_scope_id": null,
+                "context_references": [],
+                "external_references": [],
+                "version": 1
+              }
+            ],
+            "next_cursor": "eyJhZnRlciI6InNjcF8wcDhwMDM2MGF5YTFkd200YWtzNGF6dDdlMiIsImNvbnRleHRfZGlnZXN0IjoiN2Y4N2RjNWNlYTExODkwZTM3YWU4NjM4MGY3MjI2NmJhODc0YzRmMmExNGUwNGY1NTFmM2NjNTVlMGMxNDVkZiIsImV4cGlyZXNfYXQiOjE3OTEwMTkyNTgsInZlcnNpb24iOjN9.TxsTC8aMtDi0gwsks7g3JETpUjqeWQk0A7SCCPSAZBQ"
+          },
+          "isError": false
+        }
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-engineering-harness",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Project-scoped Codex engineering workflows",
   "extensions": {
     "com.openai": {

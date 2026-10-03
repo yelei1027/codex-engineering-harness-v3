@@ -69,6 +69,22 @@ def run(argv, cwd=None, timeout=60, ok=True):
 def git(repo, *args):
     return run(['git', '-C', repo, *args]).stdout
 
+def empty_tree(repo):
+    # Git can address the canonical empty tree without persisting a loose object.
+    # Fingerprinting/review discovery must stay observational in committed repos.
+    return git(repo, 'hash-object', '-t', 'tree', os.devnull).decode().strip()
+
+def git_head(repo):
+    result = run(['git', '-C', repo, 'rev-parse', '--verify', 'HEAD'], ok=False)
+    if result.returncode == 0:
+        return result.stdout.decode().strip()
+    # An unborn branch has no commit; use an empty tree without creating one.
+    branch = git(repo, 'symbolic-ref', 'HEAD').decode().strip()
+    exists = run(['git', '-C', repo, 'show-ref', '--verify', '--quiet', branch], ok=False)
+    if exists.returncode != 1:
+        raise HarnessError('Cannot resolve Git HEAD; inspect repository metadata')
+    return empty_tree(repo)
+
 def repo_root(value):
     path = Path(value).expanduser().resolve()
     root = Path(git(path, 'rev-parse', '--show-toplevel').decode().strip()).resolve()

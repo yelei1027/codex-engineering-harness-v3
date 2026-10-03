@@ -1,5 +1,5 @@
 from pathlib import Path
-from .common import ROOT,HarnessError,atomic,canonical,git,lock,now,read_json,safe_id,sha,write_json
+from .common import ROOT,HarnessError,atomic,canonical,git,git_head,lock,now,read_json,safe_id,sha,write_json
 from .review import fingerprint,names
 
 def contract():
@@ -32,9 +32,9 @@ def create(repo,task,risk,intent):
         if (path/'events.jsonl').exists():
             raise HarnessError('Task ID already exists')
         path.mkdir(parents=True,exist_ok=True)
-        head=git(repo,'rev-parse','HEAD').decode().strip()
+        head=git_head(repo)
         state={'task_id':task,'repo':str(repo),'node':contract()['entry_node'],'risk':risk,'intent':intent,
-               'baseline_head':head,'baseline_changes':names(git(repo,'diff','--name-only','-z','HEAD'))+names(git(repo,'ls-files','--others','--exclude-standard','-z')),
+               'baseline_head':head,'baseline_changes':names(git(repo,'diff','--name-only','-z',head))+names(git(repo,'ls-files','--others','--exclude-standard','-z')),
                'created':now(),'resume_node':None,'fingerprint':fingerprint(repo,head)[0]}
         save(path,state,{'action':'create'})
         return state
