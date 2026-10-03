@@ -1,0 +1,3331 @@
+{
+  "schema_version": "1.0",
+  "harness_version": "3.0.0",
+  "artifact_kind": "DESIGN_CONTRACT_NOT_RUNTIME_API",
+  "description": "V3 正式文档的节点、触发、调用和分支契约。安装 Agent 需实现并验收；本文档结构验证不等于运行时能力验收。",
+  "entry_node": "A00",
+  "pause_entry": "H00",
+  "maintenance_entry": "U10",
+  "multi_select_nodes": [
+    "D02"
+  ],
+  "delegated_subflow": {
+    "S05": {
+      "entry": "T00",
+      "dispatch_context": [
+        "executor=worker",
+        "child/run_id",
+        "return_to=R05"
+      ],
+      "exit": "D18",
+      "return_node": "R05"
+    }
+  },
+  "dynamic_resume": {
+    "marker": "RESUME",
+    "allowed_nodes": [
+      "A01",
+      "A02",
+      "I01",
+      "I02",
+      "R00",
+      "B00",
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B06",
+      "B07",
+      "D04",
+      "D05",
+      "D11",
+      "D12",
+      "D13",
+      "U01",
+      "C01",
+      "C02",
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T04",
+      "T05",
+      "V00",
+      "E00",
+      "E01",
+      "E02",
+      "E03",
+      "D20",
+      "D21",
+      "P00",
+      "P02",
+      "P04",
+      "U02",
+      "U03",
+      "U04",
+      "F00",
+      "U10",
+      "U11",
+      "U12"
+    ],
+    "authorization_recheck": {
+      "P01": "U02",
+      "P03": "U03",
+      "P06": "U04"
+    }
+  },
+  "phases": [
+    {
+      "id": "phase-a",
+      "label": "A",
+      "title": "进入项目与输入分流",
+      "description": "识别任务、验证当前 Session、隔离既有改动；文档和截图是可选输入，不是每次必跑。"
+    },
+    {
+      "id": "phase-b",
+      "label": "B",
+      "title": "澄清、取证与冻结验收",
+      "description": "只解决会影响当前任务的未知；短任务使用 Task Brief，L2 使用正式 Spec 和长任务计划。"
+    },
+    {
+      "id": "phase-c",
+      "label": "C",
+      "title": "选择执行人并组织 Ticket",
+      "description": "先确定依赖、写集与方法，再真正派发；Main 不与上游 Orchestrator 同时调度。"
+    },
+    {
+      "id": "phase-d",
+      "label": "D",
+      "title": "每个 Ticket 的实现与验证闭环",
+      "description": "同一实现者按小步完成测试和实现；非行为任务也有明确的实际修改步骤。"
+    },
+    {
+      "id": "phase-e",
+      "label": "E",
+      "title": "冻结范围、审查与问题处置",
+      "description": "已提交变更与工作区变更分别取证，最后绑定同一候选快照；报告不完整不能放行。"
+    },
+    {
+      "id": "phase-f",
+      "label": "F",
+      "title": "PR、CI、合并与应用发布",
+      "description": "本地交付与远程发布是不同出口；提交、推送、合并和部署按各自授权执行。"
+    },
+    {
+      "id": "phase-g",
+      "label": "G",
+      "title": "失败诊断与安全恢复",
+      "description": "错误按类别返回最近的必要节点；代码变化后不能复用旧快照的审查或 CI。"
+    },
+    {
+      "id": "phase-h",
+      "label": "H",
+      "title": "暂停、换会话与继续",
+      "description": "任意阶段都可安全暂停；恢复时核验项目、任务、版本与授权，再回原节点。"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "A00",
+      "phase": "phase-a",
+      "kind": "main",
+      "title": "接收需求并选择本轮入口",
+      "actor": "Main",
+      "trigger": "用户发来新需求、续接、Review 或维护请求。",
+      "action": "解析用户目标与附件；开发任务使用已安装的 harness-dev 入口。此处先分类，不安装组件、不更改业务文件。",
+      "output": "任务意图、目标项目、请求范围；未提供的业务规则仍保留为未知。",
+      "example": "$harness-dev\n为当前项目新增“供应商 CSV 导入”。先识别任务类型、项目和授权范围，由 Main 按本图自动选路。",
+      "edges": [
+        {
+          "label": "继续判断任务类型",
+          "target": "D00",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "harness-dev（V3 自定义入口）",
+      "input_location": "Codex 主对话输入框",
+      "note": "自动方式：直接描述需求。显式方式：在支持且已安装的界面选择 @Harness，或在 Codex 选择 $harness-dev。仅有 HTML 不代表入口已安装。"
+    },
+    {
+      "id": "D00",
+      "phase": "phase-a",
+      "kind": "decision",
+      "title": "本次请求属于哪一种工作？",
+      "actor": "Main Router",
+      "trigger": "A00 已解析用户意图。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D00 根据当前证据判断“本次请求属于哪一种工作？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "开发 / 修复 / 重构",
+          "target": "A01",
+          "reason": "需要实际修改当前项目。",
+          "kind": "next"
+        },
+        {
+          "label": "只做代码审查",
+          "target": "A01",
+          "reason": "设置 entry_mode=review_only；完成审查后不自动实现、提交或发布。",
+          "kind": "next"
+        },
+        {
+          "label": "恢复既有任务",
+          "target": "H02",
+          "reason": "读取指定任务交接，不凭旧聊天猜测。",
+          "kind": "next"
+        },
+        {
+          "label": "安装或维护 Harness",
+          "target": "U10",
+          "reason": "进入维护旁路，不作为业务 Ticket 的固定步骤。",
+          "kind": "next"
+        },
+        {
+          "label": "纯解释 / 非项目问题",
+          "target": "ZINFO",
+          "reason": "不启动完整开发链。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "A01",
+      "phase": "phase-a",
+      "kind": "main",
+      "title": "核对当前项目、运行时与任务基线",
+      "actor": "Main",
+      "trigger": "开发或 Review 请求进入当前项目。",
+      "action": "确认 repo root、实际 Codex binary、已加载能力、权限、branch/base/head；记录已有 staged、unstaged、untracked 文件及归属。已有用户修改不得自动 stash、reset、删除或纳入任务。",
+      "output": "本任务 ID、运行清单、授权边界与 task-start baseline。",
+      "example": "请执行 A01，只读核对当前仓库与实际运行时。记录本任务开始前的 Git 状态及文件归属；不要覆盖或清理已有改动。",
+      "edges": [
+        {
+          "label": "核对必要条件",
+          "target": "D01",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "只读 Git / Runtime inventory",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D01",
+      "phase": "phase-a",
+      "kind": "decision",
+      "title": "本轮必要能力与项目绑定是否就绪？",
+      "actor": "Main Router",
+      "trigger": "A01 已给出当前 Session 的真实证据。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D01 根据当前证据判断“本轮必要能力与项目绑定是否就绪？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "就绪；既有改动已分清",
+          "target": "A02",
+          "reason": "可选服务缺失可记录，不要求八个组件全绿。",
+          "kind": "next"
+        },
+        {
+          "label": "核心能力 / 授权 / 项目不正确",
+          "target": "F02",
+          "reason": "先处理启动或权限问题，必要时重开正确 Session。",
+          "kind": "back"
+        },
+        {
+          "label": "既有改动归属不明确",
+          "target": "F02",
+          "reason": "先确认归属或使用获授权的隔离工作区，禁止盲目纳入审查。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "磁盘配置存在不等于当前会话已经加载。审查必需的源码和范围未知也不能放行。"
+    },
+    {
+      "id": "A02",
+      "phase": "phase-a",
+      "kind": "main",
+      "title": "分类 L0 / L1 / L2 并记录路由依据",
+      "actor": "Main",
+      "trigger": "必要环境已就绪。",
+      "action": "风险优先于 diff 大小。L0 轻量；L1 标准；L2 高风险/复杂。Review-only 同样分类审查风险，但不重跑需求实现链。Bug 先记录复现目标，后续按需要使用 diagnosing-bugs。",
+      "output": "任务级别、risk reasons、entry_mode、输入需求；执行中发现新风险须重新评估。",
+      "example": "请将本任务归为 L0/L1/L2 并解释原因。权限、数据覆盖或迁移风险不能因只改几行而忽略；不要为简单任务强制启动子 Agent。",
+      "edges": [
+        {
+          "label": "开发任务：检查外部输入",
+          "target": "D02",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "Review-only：已有范围和需求引用",
+          "target": "E00",
+          "reason": "直接冻结审查目标；未运行验证必须如实记录。",
+          "kind": "next"
+        }
+      ],
+      "capability": "harness-dev / 风险分类",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D02",
+      "phase": "phase-a",
+      "kind": "decision",
+      "title": "本任务需要处理哪些外部输入？",
+      "actor": "Main Router",
+      "trigger": "开发请求已有任务级别。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D02 根据当前证据判断“本任务需要处理哪些外部输入？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "文档资料",
+          "target": "I01",
+          "reason": "需要读取 Office/PDF/HTML 等内容时处理。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "UI 参考 / 截图",
+          "target": "I02",
+          "reason": "需要视觉原型或截图解释时处理。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "没有需要转换的外部输入",
+          "target": "R00",
+          "reason": "直接使用需求和仓库，不强行调用两种工具。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "多选门：文档与 UI 可同时选中。R00 只等待本次选中的必要输入，未选分支不计为缺失。"
+    },
+    {
+      "id": "I01",
+      "phase": "phase-a",
+      "kind": "tool",
+      "title": "转换文档并抽查关键信息",
+      "actor": "Main 调用工具",
+      "trigger": "D02 选择文档分支。",
+      "action": "用已配置的 MarkItDown 转换，原始文件保留来源。抽查表格、图示说明与字段；输出很大时才让 context-mode 索引检索。解析缺失须标注，不能补造内容。",
+      "output": "资料路径、转换产物、可引用片段和遗漏项。",
+      "example": "使用已配置的 MarkItDown 转换本次需求资料，输出到 .harness-artifacts/input/。抽查字段与关键表格；大输出才用 context-mode。结果交 R00。",
+      "edges": [
+        {
+          "label": "转换及抽查完成",
+          "target": "R00",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "解析或工具失败",
+          "target": "F00",
+          "reason": "记录 resume_node=I01 和是否有可验证替代方案。",
+          "kind": "back"
+        }
+      ],
+      "capability": "MarkItDown；按需 context-mode",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "I02",
+      "phase": "phase-a",
+      "kind": "tool",
+      "title": "视觉参考转为可讨论的原型",
+      "actor": "Main 调用工具；用户确认方向",
+      "trigger": "D02 选择视觉分支。",
+      "action": "通过已部署、已验收的 screenshot-to-code 入口生成候选原型；或仅保留可直接检查的视觉参考。原型不直接充当生产代码，不连接生产数据。",
+      "output": "可查看原型、参考来源、Provider 状态和仍待确认的交互。",
+      "example": "使用已部署的 screenshot-to-code 处理本次 UI 参考，生成“上传—映射—错误列表”候选原型。不要提交为生产代码；返回预览、限制和原始输入，交 R00。",
+      "edges": [
+        {
+          "label": "视觉资料可用",
+          "target": "R00",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "Provider / 预览失败",
+          "target": "F03",
+          "reason": "标记 BLOCKED_VISUAL；只阻塞依赖它的范围。",
+          "kind": "back"
+        }
+      ],
+      "capability": "screenshot-to-code；已验证适配入口",
+      "input_location": "Codex 主对话输入框",
+      "note": "自然语言请求不是已存在的 API。安装 Agent 必须核实图片输入、实际调用、返回代码和预览的端到端路径。"
+    },
+    {
+      "id": "R00",
+      "phase": "phase-a",
+      "kind": "receive",
+      "title": "汇总本次选中的输入",
+      "actor": "Main",
+      "trigger": "文档/UI 所选分支返回，或没有外部输入。",
+      "action": "逐项核对来源与必要性；两条输入分支都被选为必需时，必须收齐。可独立推进的范围可先处理，未满足的验收项保持阻塞。",
+      "output": "当前可用资料、未解决依赖、继续工作的明确边界。",
+      "example": "请在 R00 只验收本轮实际选中的输入。列出可用资料与阻塞范围；未选 UI 分支不算缺失，未完成必需 UI 验收不能算交付。",
+      "edges": [
+        {
+          "label": "资料足以推进当前范围",
+          "target": "B00",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "必需输入仍缺失",
+          "target": "F00",
+          "reason": "等待资料或确定有证据的替代。",
+          "kind": "back"
+        }
+      ],
+      "capability": "输入汇合点",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B00",
+      "phase": "phase-b",
+      "kind": "main",
+      "title": "绑定唯一任务状态与问题清单",
+      "actor": "Main",
+      "trigger": "本轮输入已汇总。",
+      "action": "L0/L1 维护一个短 task.md；L2/跨会话长任务按已验证集成绑定 PWF plan root。已有有效计划继续使用。只列会改变实现的未知，不把全部 Skill 列成待办。",
+      "output": "唯一 task/plan owner、复现目标、需要补证或确认的问题。",
+      "example": "为本任务建立或恢复唯一状态。L0/L1 使用短 Task Brief；L2 按当前项目绑定 planning-with-files。列出仍会影响实现的未知，不重复建计划。",
+      "edges": [
+        {
+          "label": "检查路线未知",
+          "target": "D03",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "Task Brief / 条件调用 $planning-with-files",
+      "input_location": "Codex 主对话输入框",
+      "note": "PWF 未启用时不临时修改活动 Session 的 Hook 配置。需要新配置先走维护授权；本地任务状态不能与 PWF 并列为两套权威。"
+    },
+    {
+      "id": "D03",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "是否存在重大路线未知？",
+      "actor": "Main Router",
+      "trigger": "B00 已整理未知项。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D03 根据当前证据判断“是否存在重大路线未知？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "存在多条重大路线",
+          "target": "B01",
+          "reason": "需要先比较路径和待验证假设。",
+          "kind": "next"
+        },
+        {
+          "label": "路线清楚",
+          "target": "D04",
+          "reason": "只是工作量大，不构成调用 wayfinder 的理由。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B01",
+      "phase": "phase-b",
+      "kind": "skill",
+      "title": "梳理待决路线",
+      "actor": "Main",
+      "trigger": "D03 判断重大路线尚未明确。",
+      "action": "使用 wayfinder 整理候选路线、依赖与验证方法；不另建 Planner Agent，不直接扩展需求。",
+      "output": "可解释的路线问题及对应取证任务。",
+      "example": "$wayfinder\n当前 CSV 导入的同步/异步处理路线尚未确定。请列出会影响选择的规模、错误处理与一致性证据；不写生产实现。",
+      "edges": [
+        {
+          "label": "带问题进入代码取证",
+          "target": "D04",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "$wayfinder",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D04",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "是否需要补查仓库事实？",
+      "actor": "Main Router",
+      "trigger": "当前路线或需求需要代码证据；访谈也可带 resume_node 返回这里。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D04 根据当前证据判断“是否需要补查仓库事实？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "少量文件即可回答",
+          "target": "B02",
+          "reason": "Main 直接查源码或图谱，无需独立子任务。",
+          "kind": "next"
+        },
+        {
+          "label": "范围大且问题独立",
+          "target": "S06",
+          "reason": "真正派发只读 explorer。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "已有足够代码证据 / 新项目",
+          "target": "D05",
+          "reason": "跳过专门探索。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "常规结果进入 D05。若由 B04 访谈补证进入，完成后返回 B04，不另开一轮完整需求流程。"
+    },
+    {
+      "id": "B02",
+      "phase": "phase-b",
+      "kind": "tool",
+      "title": "Main 定向读取代码与调用链",
+      "actor": "Main",
+      "trigger": "D04 判断可由主会话完成。",
+      "action": "定位真实入口、校验、持久化和调用方；按需使用 CodeGraph，核对索引与源码。Bug 请求使用 diagnosing-bugs 的方法形成可复现假设。",
+      "output": "源文件/符号、版本、影响范围与尚未确认的内容。",
+      "example": "请定向检查 CSV 导入入口、重复 SKU 处理和写入路径。可用时查询 CodeGraph 并核对源码；Bug 场景先复现，不先猜测修复。",
+      "edges": [
+        {
+          "label": "常规取证完成",
+          "target": "D05",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "访谈发起的补证完成",
+          "target": "B04",
+          "reason": "仅在记录的 resume_node=B04 时返回。",
+          "kind": "return"
+        },
+        {
+          "label": "无法确认必要事实",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "源码 / CodeGraph / 条件 diagnosing-bugs",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "S06",
+      "phase": "phase-b",
+      "kind": "agent",
+      "title": "实际派发 explorer",
+      "actor": "Main → explorer",
+      "trigger": "D04 确认探索足够独立且范围可界定。",
+      "action": "创建真实只读子任务，只查指定模块和调用关系。提供 repo、任务、版本和允许工具；不修改代码、主计划或 Memory。",
+      "output": "child/run ID、实际权限、代码地图与未覆盖范围。",
+      "example": "请实际启动 explorer，调用点 S06。只读调查本次 CSV 导入入口、校验和写入链；输入当前代码版本与相关目录。返回来源位置、未覆盖项及真实运行回执，交 R06；不得修改主计划。",
+      "edges": [
+        {
+          "label": "子任务返回",
+          "target": "R06",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "无法派发 / 超时 / 权限不符",
+          "target": "F00",
+          "reason": "不得由 Main 换口吻冒充 explorer。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Subagent：explorer；工具：源码 / CodeGraph",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "R06",
+      "phase": "phase-b",
+      "kind": "receive",
+      "title": "验收 explorer 结果",
+      "actor": "Main",
+      "trigger": "S06 的独立任务返回。",
+      "action": "核对运行回执、代码版本和关键源码引用。结果不足只补对应问题；无写权限不代表远端 MCP 自动只读，须同时核对工具许可。",
+      "output": "被接受的代码证据与恢复节点。",
+      "example": "在 R06 核验 S06 的真实回执、输入版本和源码引用。只接受有证据的结论；常规进入 D05，访谈补证则回 B04。",
+      "edges": [
+        {
+          "label": "常规探索已接受",
+          "target": "D05",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "访谈补证已接受",
+          "target": "B04",
+          "reason": "resume_node=B04。",
+          "kind": "return"
+        },
+        {
+          "label": "证据缺失或版本失配",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 explorer；不创建新 Agent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D05",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "是否缺少外部技术事实？",
+      "actor": "Main Router",
+      "trigger": "代码证据已检查，或访谈需要外部资料。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D05 根据当前证据判断“是否缺少外部技术事实？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "一个短查询足够",
+          "target": "B03",
+          "reason": "Main 核验官方资料与目标版本。",
+          "kind": "next"
+        },
+        {
+          "label": "研究问题独立且较复杂",
+          "target": "S01",
+          "reason": "实际派发 researcher；不让用户代查可查询事实。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "资料已足够",
+          "target": "D06",
+          "reason": "跳过研究。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "常规结果进入 D06；从 B04 发起的研究，回到同一轮 B04。"
+    },
+    {
+      "id": "B03",
+      "phase": "phase-b",
+      "kind": "skill",
+      "title": "Main 核验版本与 API 事实",
+      "actor": "Main",
+      "trigger": "D05 选择短研究。",
+      "action": "按 research 方法查询一手文档；记录版本与限制。用户负责业务取舍，Agent 负责可查询事实。",
+      "output": "能支持当前决策的来源、适用版本、不确定项。",
+      "example": "使用当前已加载的 research 方法，核验项目锁定 CSV 库是否支持流式处理及行级错误定位。仅报告一手来源和适用版本；不改生产文件。",
+      "edges": [
+        {
+          "label": "常规研究完成",
+          "target": "D06",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "访谈补证完成",
+          "target": "B04",
+          "reason": "resume_node=B04。",
+          "kind": "return"
+        },
+        {
+          "label": "关键事实仍未知",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "research 方法；一手资料",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "S01",
+      "phase": "phase-b",
+      "kind": "agent",
+      "title": "实际派发 researcher",
+      "actor": "Main → researcher",
+      "trigger": "D05 判定研究具有独立价值。",
+      "action": "给定一个技术问题、准确版本和输出边界。researcher 使用 research 方法；只读取证，不代替用户选择业务规则，不写主计划。",
+      "output": "结论、来源、版本、限制及真实 child/run ID。",
+      "example": "请实际启动 researcher，调用点 S01。核验项目锁定 CSV 库的流式处理与逐行错误能力；使用 research 方法，只读查一手来源。返回版本范围、证据与真实回执，交 R01。",
+      "edges": [
+        {
+          "label": "子任务完成",
+          "target": "R01",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "派发或研究失败",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "Subagent：researcher；方法：research",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "R01",
+      "phase": "phase-b",
+      "kind": "receive",
+      "title": "验收 researcher 证据",
+      "actor": "Main",
+      "trigger": "S01 返回。",
+      "action": "核对来源支持结论、目标版本匹配和未确认项。返回位置由此次任务包决定，不能把别的任务结果混进当前计划。",
+      "output": "足以支撑决策的技术事实。",
+      "example": "在 R01 核验 researcher 的来源、版本、结论和运行回执。常规进入 D06；B04 补证回 B04；维护补证回 U11。",
+      "edges": [
+        {
+          "label": "开发研究已接受",
+          "target": "D06",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "访谈补证已接受",
+          "target": "B04",
+          "reason": "resume_node=B04。",
+          "kind": "return"
+        },
+        {
+          "label": "维护补证已接受",
+          "target": "U11",
+          "reason": "resume_node=U11。",
+          "kind": "return"
+        },
+        {
+          "label": "证据仍不足",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 researcher",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D06",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "仍有影响验收的业务歧义吗？",
+      "actor": "Main Router",
+      "trigger": "可查询事实已尽量解决。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D06 根据当前证据判断“仍有影响验收的业务歧义吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "有关键取舍需用户决定",
+          "target": "B04",
+          "reason": "例如覆盖/拒绝重复 SKU、权限边界、错误行处理。",
+          "kind": "next"
+        },
+        {
+          "label": "已有批准规则且仍有效",
+          "target": "D07",
+          "reason": "不重复访谈。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B04",
+      "phase": "phase-b",
+      "kind": "skill",
+      "title": "澄清必要业务规则",
+      "actor": "Main ↔ 用户",
+      "trigger": "D06 有关键歧义，或设计/审查发现需求需重新确认。",
+      "action": "唯一访谈入口为 grill-with-docs；内部使用 grilling 与 domain-modeling。只问当前未确认事项；事实缺口按 D04/D05 补证后回本轮。",
+      "output": "明确的行为、异常、权限、非目标；没有答案不编造。",
+      "example": "$grill-with-docs\n只澄清本次导入仍未确定的重复 SKU、错误行和权限规则；沿用已批准内容。可查询事实走 D04/D05，补证后回本轮访谈，不写生产代码。",
+      "edges": [
+        {
+          "label": "关键规则明确",
+          "target": "D07",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "缺仓库事实",
+          "target": "D04",
+          "reason": "记录 resume_node=B04。",
+          "kind": "back"
+        },
+        {
+          "label": "缺外部事实",
+          "target": "D05",
+          "reason": "记录 resume_node=B04。",
+          "kind": "back"
+        },
+        {
+          "label": "等待用户关键决定",
+          "target": "H00",
+          "reason": "记录恢复点 B04。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "$grill-with-docs → 内部 grilling / domain-modeling",
+      "input_location": "Codex 主对话输入框",
+      "note": "内部加载方法不是两次 Subagent。实际研究/探索才进入 S01/S06；受管 Skill 若与职责冲突，先报告适配阻塞。"
+    },
+    {
+      "id": "D07",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "需要设计或改变模块接口 / 测试入口吗？",
+      "actor": "Main Router",
+      "trigger": "业务规则已有足够清晰度。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D07 根据当前证据判断“需要设计或改变模块接口 / 测试入口吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "需要新的接口或边界",
+          "target": "B05",
+          "reason": "确定输入、输出、错误、权限位置和测试 seam。",
+          "kind": "next"
+        },
+        {
+          "label": "现有接口足够",
+          "target": "D08",
+          "reason": "跳过专门设计。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B05",
+      "phase": "phase-b",
+      "kind": "skill",
+      "title": "确定模块契约与测试入口",
+      "actor": "Main",
+      "trigger": "D07 需要设计接口。",
+      "action": "使用 codebase-design 给出最小契约、边界及可测试性；必要权衡进入 ADR。不是另开完整设计项目。",
+      "output": "可用于测试与实现的接口契约。",
+      "example": "$codebase-design\n围绕当前导入需求明确输入、结果、错误语义、权限检查位置与公共测试入口。仅形成最小接口契约，不直接写生产实现。",
+      "edges": [
+        {
+          "label": "契约明确",
+          "target": "D08",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "牵涉未批准业务取舍",
+          "target": "B04",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "$codebase-design",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D08",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "是否还需要原型验证关键交互或方案？",
+      "actor": "Main Router",
+      "trigger": "已检查接口，需要判断是否还缺可运行证据。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D08 根据当前证据判断“是否还需要原型验证关键交互或方案？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "交互 / 方案尚未确认",
+          "target": "B06",
+          "reason": "复用 I02 的产物，不重复生成同样的原型。",
+          "kind": "next"
+        },
+        {
+          "label": "已有证据或无原型需要",
+          "target": "D09",
+          "reason": "不为流程完整强制做原型。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B06",
+      "phase": "phase-b",
+      "kind": "skill",
+      "title": "验证原型并回收结论",
+      "actor": "Main；必要时用户查看",
+      "trigger": "D08 需要通过运行验证设计。",
+      "action": "使用 prototype 在隔离位置验证上传、映射、预览等关键行为；复用视觉参考。原型不能绕过正式测试、审查和数据边界。",
+      "output": "可复核演示、被接受的交互决定或明确拒绝原因。",
+      "example": "$prototype\n复用已确认参考，验证“上传→字段映射→预览→错误提示”。在隔离原型中运行，不接生产数据。返回演示和需确认的结论。",
+      "edges": [
+        {
+          "label": "验证通过",
+          "target": "D09",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "不符合业务预期",
+          "target": "B04",
+          "reason": "只回到相关需求重新确认。",
+          "kind": "back"
+        },
+        {
+          "label": "Provider / 运行故障",
+          "target": "F00",
+          "reason": "resume_node=B06。",
+          "kind": "back"
+        }
+      ],
+      "capability": "$prototype；按需 screenshot-to-code",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D09",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "形成验收基准所需的证据齐全吗？",
+      "actor": "Main Router",
+      "trigger": "需求、事实、接口和必要原型已经检查。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D09 根据当前证据判断“形成验收基准所需的证据齐全吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "关键证据齐全",
+          "target": "B07",
+          "reason": "可形成 Task Brief / Spec。",
+          "kind": "next"
+        },
+        {
+          "label": "关键业务决定未明确",
+          "target": "B04",
+          "reason": "暂停生产实现。",
+          "kind": "back"
+        },
+        {
+          "label": "工具失败或事实证据缺失",
+          "target": "F00",
+          "reason": "按具体类别补证，不把失败当批准。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "B07",
+      "phase": "phase-b",
+      "kind": "main",
+      "title": "冻结本轮验收与不做事项",
+      "actor": "Main",
+      "trigger": "D09 的关键证据完整。",
+      "action": "L0/L1 保存短 Task Brief；L2 或明确要求规格时调用 to-spec。记录目标、接口、样例、非目标、风险、验证命令与恢复要求。已有批准 Spec 不重写。",
+      "output": "Task Brief/Spec 路径与版本；本轮可变更范围。",
+      "example": "将已确认内容写成当前任务的验收基准。L0/L1 使用短 Task Brief；L2 使用 $to-spec。明确不做事项、适用验证与风险，交 U01 确认。",
+      "edges": [
+        {
+          "label": "请求或核验范围授权",
+          "target": "U01",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "Task Brief；条件 $to-spec",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U01",
+      "phase": "phase-b",
+      "kind": "decision",
+      "title": "本轮实现范围是否已获批准？",
+      "actor": "Main Router",
+      "trigger": "B07 给出具体验收版本。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请核对当前 Task Brief/Spec 是否在我的已授权范围内。已获批准就记录版本并继续；新增范围或风险请单独说明并等待决定。",
+      "edges": [
+        {
+          "label": "用户已批准 / 已在明确授权内",
+          "target": "D10",
+          "reason": "记录适用版本与权限，不重复索要同一授权。",
+          "kind": "next"
+        },
+        {
+          "label": "需要修改范围或规则",
+          "target": "B04",
+          "reason": "不派 worker。",
+          "kind": "back"
+        },
+        {
+          "label": "尚待用户决定",
+          "target": "H00",
+          "reason": "恢复点 U01；可汇报计划，不开始未授权实现。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D10",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "需要拆成多个可独立验收的 Ticket 吗？",
+      "actor": "Main Router",
+      "trigger": "本轮范围已获批准。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D10 根据当前证据判断“需要拆成多个可独立验收的 Ticket 吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "多切片 / 有依赖关系",
+          "target": "C00",
+          "reason": "先拆垂直功能和依赖，不直接开启并行。",
+          "kind": "next"
+        },
+        {
+          "label": "一个边界明确的任务",
+          "target": "C01",
+          "reason": "沿用当前任务，无需额外拆票。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "C00",
+      "phase": "phase-c",
+      "kind": "skill",
+      "title": "建立垂直切片与依赖图",
+      "actor": "Main",
+      "trigger": "D10 需要多个 Ticket。",
+      "action": "使用 to-tickets 描述每项行为、依赖、公共接口、写集与验收；只有前置任务已经接受，后继任务才进入可执行队列。创建远程 Issue 另看授权。",
+      "output": "可执行 Ticket DAG 和每个任务的允许写集。",
+      "example": "$to-tickets\n基于当前已批准 Spec 拆分可独立验收的垂直任务，列明依赖、接口和写集；不要为了数量拆票。未经授权不创建远程 Issue。",
+      "edges": [
+        {
+          "label": "选择当前可执行任务",
+          "target": "C01",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "$to-tickets",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "C01",
+      "phase": "phase-c",
+      "kind": "main",
+      "title": "为当前 Ticket 固定输入与资源边界",
+      "actor": "Main",
+      "trigger": "存在依赖已满足的 Ticket。",
+      "action": "固定任务版本、源码基线、测试入口、命令和写集；检查 API/端口/数据库/锁等共享资源。每个 Ticket 有唯一实现 owner。",
+      "output": "任务包、上下文指针、验证约定和并发预算。",
+      "example": "请选择一个依赖已满足的 Ticket，固定版本、测试入口、允许文件和共享资源。计划最多 3 个活动子任务，所有后代共用预算；不要现在就派发。",
+      "edges": [
+        {
+          "label": "选择编排模式",
+          "target": "D11",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "任务契约；最大并发 3 是本方案默认值",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D11",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "用户是否明确选择了上游完整 Orchestrator？",
+      "actor": "Main Router",
+      "trigger": "当前任务包已明确。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D11 根据当前证据判断“用户是否明确选择了上游完整 Orchestrator？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "没有明确选择",
+          "target": "D12",
+          "reason": "使用 V3 默认主线；不调用 implement/implement-spec。",
+          "kind": "next"
+        },
+        {
+          "label": "明确指定 implement / implement-spec",
+          "target": "X00",
+          "reason": "先核验其真实副作用与授权；V3 不同时运行另一套调度。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "只在 AGENTS.md 写“不要自动调用”不算强制限制。部署时应按已核验运行时设置显式调用策略或隔离 Profile，并测试误触发负例。"
+    },
+    {
+      "id": "X00",
+      "phase": "phase-c",
+      "kind": "skill",
+      "title": "独占进入上游 Orchestrator 模式",
+      "actor": "Main 执行受控模式切换",
+      "trigger": "D11 明确选择上游完整流程。",
+      "action": "先读取锁定的 SKILL.md，核对内部派发、工作树、自动审查/提交/PR 等副作用；取得对应授权后才执行。暂停 V3 的重复实现调度，权限和证据门禁仍有效。结束后接回当前候选验证。",
+      "output": "真实上游运行、子任务/变更清单和验收证据；无未知副作用。",
+      "example": "我明确选择上游 Orchestrator 模式。请先读取指定 implement 或 implement-spec 的真实行为，展示自动提交/子任务/PR 副作用。获授权且兼容后独占执行；结束后返回 V00，不并行启动 V3 worker DAG。",
+      "edges": [
+        {
+          "label": "上游执行完成，接回 V3 验证",
+          "target": "V00",
+          "reason": "先核对实际候选；同快照的完整上游证据可验收复用。",
+          "kind": "return"
+        },
+        {
+          "label": "授权不足 / 行为不能协调",
+          "target": "F02",
+          "reason": "不得先调用后补授权。",
+          "kind": "back"
+        },
+        {
+          "label": "用户改选 V3 默认模式",
+          "target": "D12",
+          "reason": "由用户明确选择，不静默更换工作流。",
+          "kind": "next"
+        }
+      ],
+      "capability": "显式 $implement 或 $implement-spec",
+      "input_location": "Codex 主对话输入框",
+      "note": "这是受控整套流程切换，不是普通 worker 的内层方法；工具名称、子任务数量与实际版本一致。"
+    },
+    {
+      "id": "D12",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "本 Ticket 值得交给 worker 吗？",
+      "actor": "Main Router",
+      "trigger": "默认编排模式，当前接口和依赖明确。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D12 根据当前证据判断“本 Ticket 值得交给 worker 吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "小任务 / 强耦合 / 资源不足",
+          "target": "D13",
+          "reason": "设置 executor=main；不产生子任务。",
+          "kind": "next"
+        },
+        {
+          "label": "独立任务 / 隔离写集 / 有并行价值",
+          "target": "D13",
+          "reason": "设置 executor=worker；现在只选执行人，D14 才真正派发。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "不同 Ticket 可重复进入这段子流程；共享文件、数据库、端口、锁或不稳定接口都可能阻止并行。"
+    },
+    {
+      "id": "D13",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "需要独立的验收测试设计吗？",
+      "actor": "Main Router",
+      "trigger": "已选择实现执行人，还未启动实现。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D13 根据当前证据判断“需要独立的验收测试设计吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "高风险 / 独立反例有价值",
+          "target": "S02",
+          "reason": "test_author 只做验收场景与获批测试补丁。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "现有验收充分 / 普通短任务",
+          "target": "D14",
+          "reason": "同一实现者在内层做小步 TDD，不拆成两次模型交接。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "S02",
+      "phase": "phase-c",
+      "kind": "agent",
+      "title": "实际派发 test_author",
+      "actor": "Main → test_author",
+      "trigger": "D13 确认独立验收视角有价值。",
+      "action": "在隔离工作区根据批准规则编写验收场景、反例与必要回归测试；仅允许指定测试写集。不是先替实现者写完全部 TDD 测试。",
+      "output": "测试补丁/场景、覆盖目标、未明确标准与真实回执。",
+      "example": "请实际启动 test_author，调用点 S02。仅基于批准规则设计重复 SKU、权限、错误行的独立验收反例；只写允许的测试文件，不写生产实现，不改主计划。返回补丁、依据和运行回执，交 R02。",
+      "edges": [
+        {
+          "label": "子任务返回",
+          "target": "R02",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "无法派发 / 越权风险",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "Subagent：test_author；验收测试方法",
+      "input_location": "Codex 主对话输入框",
+      "note": "workspace-write 不是 tests/ 白名单。需要工作区隔离、实际工具权限和合并前补丁检查。"
+    },
+    {
+      "id": "R02",
+      "phase": "phase-c",
+      "kind": "receive",
+      "title": "验收独立测试补丁",
+      "actor": "Main",
+      "trigger": "S02 返回。",
+      "action": "核对 Spec、写集、断言独立性与测试数据；不能接受为了迁就实现而降低标准的测试。接受后由 Main 受控应用。",
+      "output": "已接受的验收输入；实现者仍负责小步行为闭环。",
+      "example": "在 R02 验收 test_author 的真实回执和测试补丁：只改允许文件、断言来自批准规则、不包含生产实现。接受后进入 D14；不合格只退回该测试任务。",
+      "edges": [
+        {
+          "label": "测试输入已接受",
+          "target": "D14",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "补丁不合格",
+          "target": "S02",
+          "reason": "限定范围修正；超过重试预算进入 F00。",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 test_author",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D14",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "谁实际执行本 Ticket？",
+      "actor": "Main Router",
+      "trigger": "任务和必要独立测试已经接受。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D14 根据当前证据判断“谁实际执行本 Ticket？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "executor=main",
+          "target": "T00",
+          "reason": "Main 进入实现子流程；没有 child ID。",
+          "kind": "next"
+        },
+        {
+          "label": "executor=worker 且权限就绪",
+          "target": "S05",
+          "reason": "此处才真正启动 worker。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "权限 / 隔离条件不满足",
+          "target": "F02",
+          "reason": "不能因为写了角色名就当作已具备执行能力。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "S05",
+      "phase": "phase-c",
+      "kind": "agent",
+      "title": "实际派发 worker，执行同一实现子流程",
+      "actor": "Main → worker",
+      "trigger": "D14 分配 worker 且实际权限已核验。",
+      "action": "指定独立工作区、单个 Ticket、写集、测试和返回位置。worker 从 T00 到 D18 执行；不调用完整 implement/implement-spec，不自行新增 worker 或合并主分支。",
+      "output": "运行中的真实子任务；完成时带补丁和实际检查结果返回 R05。",
+      "example": "请实际启动 worker，调用点 S05，执行当前已批准 Ticket。使用隔离工作区与允许写集，从 T00 开始做小步测试/实现，到 D18 后返回 R05；不得调用完整 Orchestrator、放宽测试、改主计划或自行合并。",
+      "edges": [
+        {
+          "label": "子任务内部进入 T00",
+          "target": "T00",
+          "reason": "保留 executor=worker、child/run ID、return_to=R05。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "派发失败 / 超时 / 权限错误",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "Subagent：worker；内层方法：tdd",
+      "input_location": "Codex 主对话输入框",
+      "note": "图中的 T00—D18 是共享子流程，不是 Main 再重复执行一份。Main 等待，不能同时改该 worker 的文件。"
+    },
+    {
+      "id": "R05",
+      "phase": "phase-c",
+      "kind": "receive",
+      "title": "验收 worker 补丁与实际检查",
+      "actor": "Main",
+      "trigger": "worker 在 D18 结束并返回。",
+      "action": "核对任务、基线、真实回执、写集、测试未被削弱和补丁是否过期。只接收本 Ticket 的受控结果；过期补丁先重新对齐。",
+      "output": "可集成补丁，不代表最终集成版本已通过。",
+      "example": "在 R05 核验 worker 的真实回执、基线、允许写集和测试证据。接受后送 C02；越界、过期或未验证的补丁不得直接合并。",
+      "edges": [
+        {
+          "label": "补丁已接受",
+          "target": "C02",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "不合格 / 冲突 / 过期",
+          "target": "F00",
+          "reason": "交给原执行人定向修正。",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 worker",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "C02",
+      "phase": "phase-c",
+      "kind": "main",
+      "title": "受控整合已完成 Ticket",
+      "actor": "Main",
+      "trigger": "Main 自执行结束，或 R05 接受 worker 结果。",
+      "action": "按依赖顺序应用批准补丁，核对共享测试基线。Main 自执行记录 executor=main、child_id=null；不同 worker 的通过不能替代集成后的验证。",
+      "output": "当前集成候选及已接受 Ticket 状态。",
+      "example": "请在 C02 整合本轮已接受结果，只应用批准范围。Main 自执行不要编造 child ID；记录候选版本，并判断是否还有可执行 Ticket。",
+      "edges": [
+        {
+          "label": "检查任务队列",
+          "target": "D15",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "整合冲突 / 基线不一致",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "Git / 任务状态；Main 唯一整合者",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D15",
+      "phase": "phase-c",
+      "kind": "decision",
+      "title": "本轮还有未完成的必要 Ticket 吗？",
+      "actor": "Main Router",
+      "trigger": "当前结果已整合或正在等待其他独立任务。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D15 根据当前证据判断“本轮还有未完成的必要 Ticket 吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "还有依赖已满足的任务",
+          "target": "C01",
+          "reason": "在同一并发预算内继续下一项。",
+          "kind": "back"
+        },
+        {
+          "label": "所有必要 Ticket 已接受",
+          "target": "V00",
+          "reason": "进入最终候选验证。",
+          "kind": "next"
+        },
+        {
+          "label": "等待活跃任务 / 依赖阻塞",
+          "target": "H00",
+          "reason": "保存队列和恢复点 C02；不能提前算全部完成。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "T00",
+      "phase": "phase-d",
+      "kind": "decision",
+      "title": "本 Ticket 是否需要行为测试闭环？",
+      "actor": "Main Router",
+      "trigger": "当前实现者已确定；Main 或 worker 只运行一份内层流程。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "按当前 Ticket 判断是否涉及行为变化。有则进入 T01；纯非行为任务进入 T05。配置若影响权限或运行行为，不能因为文件后缀而跳过测试。",
+      "edges": [
+        {
+          "label": "新行为 / Bug 回归 / 业务逻辑",
+          "target": "T01",
+          "reason": "先选一个可观察行为及测试入口。",
+          "kind": "next"
+        },
+        {
+          "label": "纯文档 / 非行为类配置改动",
+          "target": "T05",
+          "reason": "先实际修改，再跑适用验证；不伪造 RED。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "T01",
+      "phase": "phase-d",
+      "kind": "skill",
+      "title": "一个行为：编写测试并实际观察 RED",
+      "actor": "当前实现者；测试进程执行命令",
+      "trigger": "T00 选择行为闭环，或 D17 进入下一切片。",
+      "action": "使用 tdd 方法，基于已批准 seam 编写或选取一个测试，立即运行。记录目标行为、命令、版本和失败原因。已有 Bug 必须先复现；不一次写完所有测试再一次写完实现。",
+      "output": "本切片的真实测试结果和预期行为差异。",
+      "example": "$tdd\n仅推进当前 Ticket 的下一个行为：按批准规则写一个公共接口测试，立即运行并保存命令/退出码/实际失败。不要先写生产实现，也不要批量写完整套测试。",
+      "edges": [
+        {
+          "label": "判断 RED 是否有效",
+          "target": "D16",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "测试契约不明确",
+          "target": "B07",
+          "reason": "需改变验收时重新确认版本。",
+          "kind": "back"
+        }
+      ],
+      "capability": "tdd 方法 + 实际 Test Runner",
+      "input_location": "Codex 主对话输入框",
+      "note": "这是 V3 内层阶段边界；实际锁定 Skill 若不能按阶段使用，应使用明确记录的适配方法，不能声称原版完整流程已经按要求执行。"
+    },
+    {
+      "id": "D16",
+      "phase": "phase-d",
+      "kind": "decision",
+      "title": "测试结果说明了什么？",
+      "actor": "Main Router",
+      "trigger": "T01 已实际运行测试。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D16 根据当前证据判断“测试结果说明了什么？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "因目标行为缺失而失败",
+          "target": "T02",
+          "reason": "有效 RED；进入最小实现。",
+          "kind": "next"
+        },
+        {
+          "label": "已绿且验收覆盖充分",
+          "target": "T03",
+          "reason": "可能已有实现；记录无需改实现，再做相关验证。",
+          "kind": "next"
+        },
+        {
+          "label": "已绿但测试没有证明目标",
+          "target": "T01",
+          "reason": "修正测试或补必要行为，不编造 RED。",
+          "kind": "back"
+        },
+        {
+          "label": "环境 / 导入 / 网络 / 测试缺陷",
+          "target": "F00",
+          "reason": "先区分基础设施失败与目标接口不存在；不能一概当 RED。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "目标新接口尚未创建时，应核验测试确实针对批准行为；必要时先建立最小接口桩。依赖安装失败或错误导入路径不是有效行为证据。"
+    },
+    {
+      "id": "T02",
+      "phase": "phase-d",
+      "kind": "main",
+      "title": "实现本切片的最小行为",
+      "actor": "当前实现者",
+      "trigger": "D16 接受有效 RED，或失败诊断确认需要代码修复。",
+      "action": "只实现当前批准行为；不夹带无关重构，不放宽测试、权限或异常处理来变绿。接口/验收变化先回 B07/U01。",
+      "output": "受控代码补丁，尚未宣称通过。",
+      "example": "针对已核验的本切片 RED 编写最小实现，只修改允许文件。保持测试标准与权限边界不变；完成后立即运行 T03。",
+      "edges": [
+        {
+          "label": "实现完成，验证 GREEN",
+          "target": "T03",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "发现需求/接口需改变",
+          "target": "B07",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "当前实现者；不调用完整 implement",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "T03",
+      "phase": "phase-d",
+      "kind": "tool",
+      "title": "运行 GREEN 与相关检查",
+      "actor": "测试进程；当前实现者发起",
+      "trigger": "已有当前切片实现，或确认行为本来已满足。",
+      "action": "运行当前测试及必要邻近回归，保存真实命令、退出码、版本和日志路径。大日志可定向提取，但原始证据保留。",
+      "output": "当前切片的可复核通过/失败结果。",
+      "example": "运行本切片已批准测试及必要邻近回归，记录实际命令、退出码和候选版本。测试运行无需额外 Agent；失败保留原日志并交 D17。",
+      "edges": [
+        {
+          "label": "检查结果与剩余行为",
+          "target": "D17",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "Test Runner；按需 context-mode",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D17",
+      "phase": "phase-d",
+      "kind": "decision",
+      "title": "检查通过后还有必要行为未实现吗？",
+      "actor": "Main Router",
+      "trigger": "T03 返回真实结果。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D17 根据当前证据判断“检查通过后还有必要行为未实现吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "检查失败",
+          "target": "F00",
+          "reason": "记录 resume_node=T03；先按类别诊断。",
+          "kind": "back"
+        },
+        {
+          "label": "已通过，但还有下一个行为",
+          "target": "T01",
+          "reason": "一次一个行为继续，不重跑已完成的需求访谈。",
+          "kind": "back"
+        },
+        {
+          "label": "所有当前 Ticket 行为完成",
+          "target": "T04",
+          "reason": "收敛本 Ticket。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "T04",
+      "phase": "phase-d",
+      "kind": "main",
+      "title": "必要时做小范围重构并重新验证",
+      "actor": "当前实现者",
+      "trigger": "Ticket 的必要行为检查已通过。",
+      "action": "无必要就不重构。有必要且在批准范围内时做保持行为的调整，然后回 T03。此处是项目收敛政策，不强称任何上游 tdd 的内部重构规则与之相同。",
+      "output": "未修改的已验证结果，或必须重新验证的新补丁。",
+      "example": "仅检查本 Ticket 是否需要保持行为不变的小范围重构。没有必要就去 D18；发生实际改动则回 T03 重测，不夹带架构重写。",
+      "edges": [
+        {
+          "label": "没有进一步代码变化",
+          "target": "D18",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "完成了必要重构",
+          "target": "T03",
+          "reason": "旧结果不能直接代表新代码。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Main / worker；项目收敛规则",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "T05",
+      "phase": "phase-d",
+      "kind": "main",
+      "title": "执行非行为变更，并运行适用验证",
+      "actor": "当前实现者 + 检查程序",
+      "trigger": "T00 确认为纯文档或非行为任务。",
+      "action": "实际修改批准文件，再运行适用的格式、链接、配置解析、构建或文档渲染检查。若发现会影响运行行为，返回 T00 重新选择验证路径。",
+      "output": "真实改动与适用检查；明确为何不需要行为 RED。",
+      "example": "先完成当前批准的文档/非行为配置修改，再运行对应解析、链接或构建检查。不得从“准备”直接跳到“已验证”，也不要编造 RED。",
+      "edges": [
+        {
+          "label": "适用检查通过",
+          "target": "D18",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "检查失败",
+          "target": "F00",
+          "reason": "resume_node=T05。",
+          "kind": "back"
+        },
+        {
+          "label": "发现实际行为变化",
+          "target": "T00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "实际文件修改 + 适用检查",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D18",
+      "phase": "phase-d",
+      "kind": "decision",
+      "title": "当前结果应交给谁验收？",
+      "actor": "Main Router",
+      "trigger": "本 Ticket 行为闭环或非行为验证完成。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "本 Ticket 已收敛。若当前执行者是 worker，结束子任务并返回 R05；若是 Main，记录 executor=main 后到 C02。两条路不能都执行。",
+      "edges": [
+        {
+          "label": "executor=worker",
+          "target": "R05",
+          "reason": "子任务结束，返回真实补丁与检查回执。",
+          "kind": "return"
+        },
+        {
+          "label": "executor=main",
+          "target": "C02",
+          "reason": "Main 自执行结果直接整合，不伪造子任务 ID。",
+          "kind": "return"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "V00",
+      "phase": "phase-d",
+      "kind": "tool",
+      "title": "验证最终集成候选",
+      "actor": "Main 发起测试/构建进程",
+      "trigger": "所有必要 Ticket 已整合，或上游独占流程结束。",
+      "action": "在最终候选上运行适用测试、typecheck、lint、build 和必要 UI/E2E。只有代码内容、依赖、命令、环境一致的检查才可有证据地复用；新集成和受影响检查不能略过。",
+      "output": "checks.json：实际命令、退出码、内容标识、依赖与环境摘要。",
+      "example": "请验证当前最终集成候选：运行本项目适用的测试、类型检查、Lint、构建和必要 E2E。记录真实证据；只复用输入与环境完全一致的检查，不用 worker 局部通过替代。",
+      "edges": [
+        {
+          "label": "判断必要检查是否齐全",
+          "target": "D19",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "实际 Test Runner / Build / Browser",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D19",
+      "phase": "phase-d",
+      "kind": "decision",
+      "title": "候选的必要检查均已实际通过吗？",
+      "actor": "Main Router",
+      "trigger": "V00 已完成本轮验证。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D19 根据当前证据判断“候选的必要检查均已实际通过吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "均通过且证据绑定当前候选",
+          "target": "E00",
+          "reason": "冻结审查输入。",
+          "kind": "next"
+        },
+        {
+          "label": "有失败 / 缺执行 / 必要 UI 未验收",
+          "target": "F00",
+          "reason": "resume_node=V00；未执行不是 PASS。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "E00",
+      "phase": "phase-e",
+      "kind": "tool",
+      "title": "冻结本轮完整审查目标",
+      "actor": "Main 调用证据收集器",
+      "trigger": "开发候选验证完成，或用户仅请求 Review。",
+      "action": "记录 merge-base/head、任务初始基线及当前工作树。收集已提交任务差异、staged/unstaged、相关 untracked 源码与必要完整文件；先允许清单与秘密过滤，再核验内容稳定。每次形成新 snapshot-id，不覆盖旧输入。",
+      "output": "不可变输入清单、源码快照、hash、Spec 引用和检查记录；Review-only 可保留 UNVERIFIED。",
+      "example": "请执行 E00：冻结本次实际变更，包含任务已提交部分、staged、unstaged 和相关 untracked 源码。先排除秘密和无关改动；保存源码内容、文件清单及 hash，不只存路径，生成独立 snapshot-id。",
+      "edges": [
+        {
+          "label": "判断目标和审查路径",
+          "target": "D20",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "冻结期间源码变化 / 收集失败",
+          "target": "F00",
+          "reason": "不得把混合时刻的目录命名为 frozen。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Git / snapshot collector；不是审查器",
+      "input_location": "Codex 主对话输入框",
+      "note": "冻结输入与 review-results 分开：新增审查报告不改变输入 hash。只有路径清单而无可读内容，不能保证只读 reviewer 能完整审查。"
+    },
+    {
+      "id": "D20",
+      "phase": "phase-e",
+      "kind": "decision",
+      "title": "该快照应该走哪一种审查路径？",
+      "actor": "Main Router",
+      "trigger": "E00 已固定待审内容和输入标识。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D20 根据当前证据判断“该快照应该走哪一种审查路径？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "L0：小范围低风险",
+          "target": "E02",
+          "reason": "对冻结差异做完整但轻量的核对；不必双轴派发。",
+          "kind": "next"
+        },
+        {
+          "label": "L1/L2：纯已提交范围",
+          "target": "S07",
+          "reason": "使用适用的 Matt code-review；内部 Spec/Standards 子任务明确登记。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "L1/L2：dirty 或提交＋dirty 混合",
+          "target": "E01",
+          "reason": "OCR 范围/规则预处理＋快照审查；不能只看 HEAD。",
+          "kind": "next"
+        },
+        {
+          "label": "快照已过期 / 归属或内容缺失",
+          "target": "F00",
+          "reason": "重新冻结或澄清范围，不能进入审查成功出口。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "用户强制选择 Matt 时，如目标仍 dirty，先说明范围限制；只有已授权的隔离 review commit 或完整快照适配才可使用，不能自动 git add/commit 用户所有文件。"
+    },
+    {
+      "id": "S07",
+      "phase": "phase-e",
+      "kind": "agent",
+      "title": "Matt 两轴审查：登记真实内部子任务",
+      "actor": "Main → Standards / Spec 子任务",
+      "trigger": "D20 的纯提交范围适用当前锁定 code-review。",
+      "action": "先验证 fixed point 和实际 diff，再加载 code-review。该上游若内部启动 Standards、Spec 子任务，必须记录真实回执并计入同一并发预算；不再额外包一层同职责 reviewer。",
+      "output": "两轴报告、各自覆盖范围与运行回执。",
+      "example": "$code-review\n仅审查 E00 冻结的已提交任务范围，以已核验 fixed point 与 Spec/Task Brief 为准。内部 Standards/Spec 子任务登记为 S07，计入统一预算；只读报告，结果交 R07。",
+      "edges": [
+        {
+          "label": "内部子任务结果返回",
+          "target": "R07",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "范围 / 派发 / 工具失败",
+          "target": "F00",
+          "reason": "不得以“加载了 Skill”冒充审查完成。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Skill：$code-review；内部真实 Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "S07 是实际内部委派点，不是第七种固定角色。确切子任务数量、工具和授权以锁定版本与运行回执为准。"
+    },
+    {
+      "id": "R07",
+      "phase": "phase-e",
+      "kind": "receive",
+      "title": "接收两轴报告并核对覆盖",
+      "actor": "Main",
+      "trigger": "S07 返回。",
+      "action": "分别保留 Spec 与 Standards 结果，不用一轴的通过掩盖另一轴。核对输入快照、任务回执、跳过原因和未完成范围。",
+      "output": "有效主审查报告；缺少必须轴则未完成。",
+      "example": "在 R07 分别核验 Spec 和 Standards 报告、真实子任务回执及快照 ID。覆盖不完整先补证或重审；不要把“无报告”当作“无问题”。",
+      "edges": [
+        {
+          "label": "主审查已完成",
+          "target": "D21",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "报告 / 版本 / 覆盖不完整",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 S07；不重复派发",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "E01",
+      "phase": "phase-e",
+      "kind": "tool",
+      "title": "为工作区或混合目标解析审查范围与规则",
+      "actor": "Main 调用 OCR CLI / 适配器",
+      "trigger": "D20 选择 dirty/mixed 审查。",
+      "action": "OCR Delegation 负责文件选择与规则解析，不负责自动创建 reviewer。混合目标必须同时包含 merge-base→HEAD 的任务提交和 HEAD→当前工作树；统一为最终文件内容审查，不能只跑 workspace preview 就漏掉提交部分。",
+      "output": "按 path/status 可追溯的清单、规则组、全部必要源码和排除原因。",
+      "example": "使用已验收的 OCR Delegation 解析本次快照的范围与规则。若存在任务提交＋dirty 改动，同时覆盖两部分；逐项对应最终文件内容。不要只取 workspace preview 就声称全量覆盖。",
+      "edges": [
+        {
+          "label": "范围与规则已核对",
+          "target": "E02",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "OCR 不可用 / 规则证据缺失",
+          "target": "F03",
+          "reason": "允许已批准的完整快照审查替代；不得冒称 OCR 成功。",
+          "kind": "back"
+        }
+      ],
+      "capability": "OpenCodeReview Delegation；冻结快照",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "E02",
+      "phase": "phase-e",
+      "kind": "main",
+      "title": "审查冻结快照，而非当前随时变化的目录",
+      "actor": "Main",
+      "trigger": "L0 轻量审查，或 E01 完成工作区/混合范围准备。",
+      "action": "对 Task Brief/Spec、规范、正确性和测试缺口进行核对。每个相关文件必须 reviewed 或明确 skipped；必需内容未审不能放行。L1 主审查一次完成，L2 的独立风险视角由 D21 决定。",
+      "output": "绑定 snapshot-id 的主审查报告、文件覆盖表与 findings。",
+      "example": "请对冻结快照做主审查：需求是否满足、范围是否扩大、实现及测试是否正确、规范是否违背。逐文件记录覆盖和跳过原因；不要再重复运行同目标的 Matt 全套审查。",
+      "edges": [
+        {
+          "label": "报告完成",
+          "target": "D21",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "源码 / 需求 / 证据不足",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "Main 审查方法；OCR 仅提供范围与规则",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D21",
+      "phase": "phase-e",
+      "kind": "decision",
+      "title": "本轮是否需要独立风险审查？",
+      "actor": "Main Router",
+      "trigger": "主审查已经完成且目标快照一致。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D21 根据当前证据判断“本轮是否需要独立风险审查？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "L2 / 明确要求 / 项目政策要求",
+          "target": "S04",
+          "reason": "独立检查权限、数据、并发、回归等风险。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "L0/L1 且无独立审查要求",
+          "target": "E03",
+          "reason": "记录无需第二次审查的原因。",
+          "kind": "next"
+        },
+        {
+          "label": "已有等价独立审查证据",
+          "target": "R04",
+          "reason": "仅限同一快照、所需轴与实际独立执行均可证明；先验收，不直接跳过。",
+          "kind": "return"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "小 diff 不代表低风险；Main 自审不能替代独立上下文。上游完整流程已做的审查只有证据满足本契约时才复用。"
+    },
+    {
+      "id": "S04",
+      "phase": "phase-e",
+      "kind": "agent",
+      "title": "实际派发独立 reviewer",
+      "actor": "Main → reviewer",
+      "trigger": "D21 要求独立风险视角。",
+      "action": "给定只读 frozen target、验收、测试和必要结构证据；限制远端写工具。聚焦正确性、权限、数据、并发与回归，不重复一般排版风格检查。使用 OCR 规则不等于已经独立审查。",
+      "output": "真实运行回执、权限、风险 findings、覆盖与不确定项。",
+      "example": "请实际启动独立 reviewer，调用点 S04。只读审查冻结 snapshot-id 对应源码与验收，检查权限、数据、并发和回归；不改文件或主计划。返回真实回执、证据、严重度及未覆盖项，交 R04。",
+      "edges": [
+        {
+          "label": "独立审查返回",
+          "target": "R04",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "无独立执行能力 / 超时 / 权限不符",
+          "target": "F00",
+          "reason": "需要独立审查的范围保持阻塞。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Subagent：reviewer；按需 OCR / CodeGraph 冻结证据",
+      "input_location": "Codex 主对话输入框",
+      "note": "若采用获批只读独立进程替代原生子任务，报告真实执行方式，不能伪装成原生 Subagent；worktree 不是安全沙盒。"
+    },
+    {
+      "id": "R04",
+      "phase": "phase-e",
+      "kind": "receive",
+      "title": "验收独立风险报告",
+      "actor": "Main",
+      "trigger": "S04 返回，或提供了可复用的等价独立报告。",
+      "action": "核对 snapshot-id、实际独立执行、权限、源码定位和覆盖。报告未完成、工具失败与“没有发现问题”是不同状态。",
+      "output": "被接受的独立报告及仍需处理的 findings。",
+      "example": "在 R04 核对 reviewer 是否实际独立执行、审查目标是否一致、报告是否完整。缺回执或覆盖不足不得用 Main 自审补成独立通过。",
+      "edges": [
+        {
+          "label": "报告有效",
+          "target": "E03",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "报告不足 / 版本过期",
+          "target": "F00",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "接收 reviewer；不改审查输入",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "E03",
+      "phase": "phase-e",
+      "kind": "main",
+      "title": "逐项处置问题并复核证据",
+      "actor": "Main",
+      "trigger": "主审查及必要独立审查完成。",
+      "action": "确认每条 finding 的影响；误报给出可复核理由，风险接受仅由有权者决定。代码问题、需求变化、服务失败、证据缺口分开处理，不统一退回构建起点。",
+      "output": "findings 的处置状态、需要修改的范围及放行依据。",
+      "example": "请逐项核实本轮 findings：成立问题安排最小修复，误报保留证据和理由，未完成报告仍标阻塞。区分代码、需求、服务和证据问题，不盲目重跑全部构建。",
+      "edges": [
+        {
+          "label": "判断是否还有阻塞",
+          "target": "D22",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "Main findings disposition",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D22",
+      "phase": "phase-e",
+      "kind": "decision",
+      "title": "还有未解决的阻塞项吗？",
+      "actor": "Main Router",
+      "trigger": "E03 已分类审查结果。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D22 根据当前证据判断“还有未解决的阻塞项吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "无阻塞且所需审查完整",
+          "target": "D23",
+          "reason": "还须确认本轮是只审查还是继续交付。",
+          "kind": "next"
+        },
+        {
+          "label": "代码 / 测试 / 配置缺陷",
+          "target": "F00",
+          "reason": "修复后走必要验证→新快照→受影响审查。",
+          "kind": "back"
+        },
+        {
+          "label": "验收或范围需改变",
+          "target": "B04",
+          "reason": "重新确认，不让实现者自行降标准。",
+          "kind": "back"
+        },
+        {
+          "label": "服务故障 / 证据不足 / 报告未完成",
+          "target": "F00",
+          "reason": "源码不变时只补对应证据或重试审查。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D23",
+      "phase": "phase-e",
+      "kind": "decision",
+      "title": "本次是只审查，还是开发交付？",
+      "actor": "Main Router",
+      "trigger": "所需 Review 已完成。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D23 根据当前证据判断“本次是只审查，还是开发交付？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "entry_mode=review_only",
+          "target": "ZREPORT",
+          "reason": "只返回审查报告；未测项目仍是 UNVERIFIED，不自动修复或 PR。",
+          "kind": "next"
+        },
+        {
+          "label": "开发 / 修复任务",
+          "target": "P00",
+          "reason": "继续交付前的证据核对。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P00",
+      "phase": "phase-f",
+      "kind": "main",
+      "title": "准备本轮交付摘要",
+      "actor": "Main",
+      "trigger": "开发任务已通过必要验证和审查。",
+      "action": "汇总目标、实际改动、测试/审查证据、风险和限制；核对当前内容仍对应已审快照。准备交付不自动等于创建 PR。",
+      "output": "本地交付材料或待授权 PR 草稿。",
+      "example": "请准备本轮交付摘要，引用实际验证和审查快照，说明剩余风险。先确认用户需要本地结果还是远程 PR，不自动推送。",
+      "edges": [
+        {
+          "label": "选择交付方式",
+          "target": "D24",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "内容已变化 / 证据失配",
+          "target": "V00",
+          "reason": "重新验证受影响范围。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Main 交付汇总",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D24",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "用户需要哪一种交付？",
+      "actor": "Main Router",
+      "trigger": "P00 已准备摘要。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D24 根据当前证据判断“用户需要哪一种交付？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "仅本地修改 / 补丁 / 报告",
+          "target": "P05",
+          "reason": "如实标注本地完成；CI 未运行不说 CI 通过。",
+          "kind": "next"
+        },
+        {
+          "label": "需要远程 PR",
+          "target": "U02",
+          "reason": "核验提交、推送和目标仓库授权。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U02",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "创建 PR 所需的具体操作已获授权吗？",
+      "actor": "Main Router",
+      "trigger": "远程交付被请求。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请列出将暂存/提交的文件、任务分支、远端和 PR 目标。仅执行现有明确授权覆盖的动作；新增推送或远程操作先等待批准。",
+      "edges": [
+        {
+          "label": "授权完整",
+          "target": "P01",
+          "reason": "限定文件、任务分支、远端和 PR 目标。",
+          "kind": "next"
+        },
+        {
+          "label": "仅允许生成草稿 / 本地结果",
+          "target": "P05",
+          "reason": "保持本地交付，不把草稿称已创建 PR。",
+          "kind": "next"
+        },
+        {
+          "label": "仍缺用户授权",
+          "target": "H00",
+          "reason": "恢复点 U02。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P01",
+      "phase": "phase-f",
+      "kind": "skill",
+      "title": "受控提交并准备或创建 PR",
+      "actor": "Main",
+      "trigger": "U02 已核验授权范围。",
+      "action": "按已批准文件列表提交/推送并使用 pr 方法准备 PR；不顺带暂存用户无关修改、不自行 merge。将最终 PR head 与已审内容关联。",
+      "output": "真实 commit/PR 回执和内容一致性记录。",
+      "example": "$pr\n在已获授权范围内，只提交/推送本任务文件并准备或创建指定 PR。说明测试、审查、风险和回滚方式；不要自动合并，返回真实 head 与 PR 回执。",
+      "edges": [
+        {
+          "label": "核验最终 head",
+          "target": "D25",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "Git / 远端操作失败",
+          "target": "F00",
+          "reason": "resume_node=P01；不得重复制造 PR 或提交。",
+          "kind": "back"
+        }
+      ],
+      "capability": "$pr；Git / 远端连接器",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D25",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "最终 PR 内容与被验证、被审查的快照一致吗？",
+      "actor": "Main Router",
+      "trigger": "P01 返回当前 head。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D25 根据当前证据判断“最终 PR 内容与被验证、被审查的快照一致吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "内容、依赖、配置一致",
+          "target": "P02",
+          "reason": "绑定新 head；内容等价证明允许复用对应本地证据。",
+          "kind": "next"
+        },
+        {
+          "label": "代码 / 依赖 / 配置已变化",
+          "target": "V00",
+          "reason": "使受影响旧证据失效，重新验证和审查。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "commit SHA 改变与代码内容改变不是同一件事。只有可验证的内容等价关系才允许复用本地证据；CI 仍需匹配最终 head 或仓库要求的合并候选。"
+    },
+    {
+      "id": "P02",
+      "phase": "phase-f",
+      "kind": "tool",
+      "title": "运行或查询当前版本 CI",
+      "actor": "CI 系统；Main 查询",
+      "trigger": "PR 已创建且内容一致性检查通过。",
+      "action": "依据仓库策略检查当前 head/merge candidate 的必要 CI 与审批。不能使用历史 head 的成功替代。重复查询不构成新运行证据。",
+      "output": "当前目标的 CI 结果、审批状态与失败日志引用。",
+      "example": "请查询或按授权触发当前 PR head 的必需 CI，核对 head/merge candidate 与批准规则。返回真实状态和日志；历史成功、未运行和仍运行均不能算通过。",
+      "edges": [
+        {
+          "label": "判断 CI 与仓库条件",
+          "target": "D26",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "真实 CI / GitHub 等已连接平台",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D26",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "CI 与仓库的必要检查满足了吗？",
+      "actor": "Main Router",
+      "trigger": "P02 已取得实际状态。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D26 根据当前证据判断“CI 与仓库的必要检查满足了吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "当前目标所有必需检查通过",
+          "target": "U03",
+          "reason": "进入合并授权判断，不直接 merge。",
+          "kind": "next"
+        },
+        {
+          "label": "检查失败",
+          "target": "F00",
+          "reason": "记录失败命令、目标与 resume_node=P02。",
+          "kind": "back"
+        },
+        {
+          "label": "仍运行 / 审批未完成",
+          "target": "H00",
+          "reason": "保存 pending 状态和恢复点 P02，不宣称交付门禁通过。",
+          "kind": "pause"
+        },
+        {
+          "label": "head 已变化",
+          "target": "D25",
+          "reason": "先核对内容和证据，再决定必要重跑。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U03",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "本轮要合并，并且该版本已获合并授权吗？",
+      "actor": "Main Router",
+      "trigger": "CI 条件满足。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请展示将合并的 PR、head 和目标分支。只有本次合并已获明确授权时才执行；只要求 PR 就以 PR_READY 结束。",
+      "edges": [
+        {
+          "label": "已请求且明确授权合并",
+          "target": "P03",
+          "reason": "核对目标分支和当前 head 后执行。",
+          "kind": "next"
+        },
+        {
+          "label": "只要求 PR，不要求合并",
+          "target": "P05",
+          "reason": "以 PR_READY 交付，不宣称已经合并。",
+          "kind": "next"
+        },
+        {
+          "label": "请求合并但授权未到",
+          "target": "H00",
+          "reason": "恢复点 U03；等待具体批准。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P03",
+      "phase": "phase-f",
+      "kind": "main",
+      "title": "执行获批合并并记录真实结果",
+      "actor": "Main / 获授权执行者",
+      "trigger": "U03 合并授权与当前 head 一致。",
+      "action": "按仓库规则执行合并，记录合并结果；合并前 head 或规则变化须回原门禁。应用部署是独立动作。",
+      "output": "真实合并回执与目标分支状态。",
+      "example": "按 U03 已批准的准确版本执行合并并核对结果。若 head 已变化则停止重验；不要随合并自动部署应用。",
+      "edges": [
+        {
+          "label": "已合并，判断是否部署",
+          "target": "D27",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "版本变化 / 合并失败",
+          "target": "F00",
+          "reason": "不能把失败说成已合并。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Git / 远端合并能力",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D27",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "本轮还需要部署应用吗？",
+      "actor": "Main Router",
+      "trigger": "P03 已确认合并结果。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D27 根据当前证据判断“本轮还需要部署应用吗？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "不需要部署",
+          "target": "P05",
+          "reason": "记录 MERGED_NOT_DEPLOYED。",
+          "kind": "next"
+        },
+        {
+          "label": "用户要求应用上线",
+          "target": "P04",
+          "reason": "先准备制品、预发布与恢复证据。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "应用发布与 Harness 自身更新是不同流程；部署故障不得触发全局插件升级。"
+    },
+    {
+      "id": "P04",
+      "phase": "phase-f",
+      "kind": "tool",
+      "title": "验证发布制品与预发布环境",
+      "actor": "Main / 构建部署工具",
+      "trigger": "D27 明确要求应用部署。",
+      "action": "构建固定版本制品，按授权在非生产环境验证必要集成、迁移与健康检查；准备可执行恢复方案。数据库恢复不能靠简单降级二进制。",
+      "output": "artifact digest、环境、预发布结果和恢复边界。",
+      "example": "为已合并版本构建固定制品，在已授权预发布环境验证，并给出部署目标、健康标准和恢复方案。不要直接进入生产，不改变 Harness 组件。",
+      "edges": [
+        {
+          "label": "预发布与恢复证据满足",
+          "target": "U04",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "预发布 / 构建 / 恢复准备失败",
+          "target": "F00",
+          "reason": "resume_node=P04。",
+          "kind": "back"
+        }
+      ],
+      "capability": "应用构建 / 预发布验证",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U04",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "此制品和目标环境已获部署授权吗？",
+      "actor": "Main Router",
+      "trigger": "P04 已给出准确版本、目标和恢复方案。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请核对准备部署的制品、目标环境、数据库动作和恢复范围是否均已明确批准。只在授权完整时执行，不把 PR 合并许可扩展为生产部署许可。",
+      "edges": [
+        {
+          "label": "明确批准当前计划",
+          "target": "P06",
+          "reason": "只部署获批 artifact digest。",
+          "kind": "next"
+        },
+        {
+          "label": "暂不部署",
+          "target": "P05",
+          "reason": "如实交付已合并、未部署状态。",
+          "kind": "next"
+        },
+        {
+          "label": "等待新增权限或迁移批准",
+          "target": "H00",
+          "reason": "恢复点 U04，不以旧合并授权代替。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P06",
+      "phase": "phase-f",
+      "kind": "tool",
+      "title": "部署应用并执行健康检查",
+      "actor": "获授权部署工具；Main 核验",
+      "trigger": "U04 对具体计划完成授权。",
+      "action": "执行发布并核对真实版本和业务健康指标。以实际探测作为完成证据，不以容器 running 或命令退出 0 代替业务可用。",
+      "output": "部署回执、版本/制品摘要及健康结果。",
+      "example": "按已批准发布计划部署固定制品，执行对应健康与业务探测，记录真实版本和结果。失败则进入 F04 应用恢复，不更新 Harness。",
+      "edges": [
+        {
+          "label": "发布与健康验证均通过",
+          "target": "P05",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "发布或健康检查失败",
+          "target": "F04",
+          "reason": "保留故障证据，按批准的恢复方案处理。",
+          "kind": "back"
+        }
+      ],
+      "capability": "应用部署 / 健康检查",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P05",
+      "phase": "phase-f",
+      "kind": "main",
+      "title": "记录本轮实际完成状态",
+      "actor": "Main",
+      "trigger": "本地交付、PR、合并或部署中的所需目标已完成。",
+      "action": "只标记实际达到的状态：LOCAL_READY、PR_READY、MERGED_NOT_DEPLOYED、DEPLOYED。归档必要证据和剩余风险，更新唯一主任务状态；不补写未执行的测试。",
+      "output": "准确交付状态、证据与未完成事项。",
+      "example": "请按真实结果总结本轮完成状态，区分本地完成、PR_READY、已合并未部署和已部署。更新唯一主计划，附证据位置；未执行项明确标记。",
+      "edges": [
+        {
+          "label": "判断是否需要阶段复盘",
+          "target": "D28",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "Main task/plan owner",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D28",
+      "phase": "phase-f",
+      "kind": "decision",
+      "title": "是否需要正式阶段复盘？",
+      "actor": "Main Router",
+      "trigger": "本轮交付状态已记录。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D28 根据当前证据判断“是否需要正式阶段复盘？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "L2 / 重复故障 / 阶段里程碑",
+          "target": "P07",
+          "reason": "形成可执行改进项，不自动更新组件。",
+          "kind": "next"
+        },
+        {
+          "label": "普通小任务",
+          "target": "ZDONE",
+          "reason": "简短总结即可，不为形式延长任务。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "P07",
+      "phase": "phase-f",
+      "kind": "skill",
+      "title": "复盘并形成独立改进任务",
+      "actor": "Main",
+      "trigger": "D28 判断复盘有价值。",
+      "action": "使用 retro 分析可重复故障、导航、规范和环境问题。Harness 改动另走 U10；业务架构改造形成下一轮 Task，不夹带进已完成范围。",
+      "output": "改进建议与必要的新任务，不自动更改 accepted lock。",
+      "example": "$retro\n复盘本轮可重复故障与流程问题，给出可验证改进项。不要修改已批准需求、自动升级插件或夹带架构重写；需要维护则另走 U10。",
+      "edges": [
+        {
+          "label": "复盘完成",
+          "target": "ZDONE",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "$retro；改进任务独立排期",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "F00",
+      "phase": "phase-g",
+      "kind": "decision",
+      "title": "失败属于哪一类，应该回到哪里？",
+      "actor": "Main Router",
+      "trigger": "任一节点失败、关键证据缺失或内容过期；先保留 failed_node、resume_node、snapshot-id。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请先在 F00 分类本次失败，保留原日志与 failed_node/resume_node。明确是代码、环境、权限、证据、可选服务还是应用发布问题，再选择最短且仍满足门禁的返回路线。",
+      "edges": [
+        {
+          "label": "代码 / 测试 / 环境原因明确",
+          "target": "F01",
+          "reason": "最小修复后回原检查；有效 RED 不走故障处理。",
+          "kind": "next"
+        },
+        {
+          "label": "跨模块 / 多日志 / 根因复杂",
+          "target": "S03",
+          "reason": "独立只读诊断，返回 Main 决定修复。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "权限 / 运行时 / 归属阻塞",
+          "target": "F02",
+          "reason": "保留业务内容，处理必要授权。",
+          "kind": "next"
+        },
+        {
+          "label": "可选工具 / Provider 不可用",
+          "target": "F03",
+          "reason": "验证替代路径或局部阻塞。",
+          "kind": "next"
+        },
+        {
+          "label": "仅 Review 材料缺失；候选代码与验证未变",
+          "target": "E00",
+          "reason": "重新冻结并补齐证据；不无故重跑实现与构建。",
+          "kind": "back"
+        },
+        {
+          "label": "Review / CI 后候选代码或依赖已改变",
+          "target": "V00",
+          "reason": "先重验受影响检查，再冻结新快照和审查。",
+          "kind": "back"
+        },
+        {
+          "label": "业务验收变化",
+          "target": "B04",
+          "reason": "重新确认，不自行降低标准。",
+          "kind": "back"
+        },
+        {
+          "label": "当前 CI / 远端服务瞬时故障",
+          "target": "P02",
+          "reason": "仅在源码和目标未变且根因已确认时重试；其他错误走 F01/S03。",
+          "kind": "back"
+        },
+        {
+          "label": "应用发布故障",
+          "target": "F04",
+          "reason": "使用应用恢复流程。",
+          "kind": "next"
+        },
+        {
+          "label": "Harness 候选失败；正式环境尚未改变",
+          "target": "U11",
+          "reason": "只修订候选计划，不对未改变的正式环境执行回滚。",
+          "kind": "back"
+        },
+        {
+          "label": "Harness 已激活且正式受管环境发生故障",
+          "target": "U16",
+          "reason": "只恢复此次受管维护事务。",
+          "kind": "next"
+        },
+        {
+          "label": "合并条件 / 目标分支变化，候选代码未变",
+          "target": "P02",
+          "reason": "重新核对 CI 和仓库合并条件，之后回 U03 校验授权。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "同一原因最多两轮无进展重试（本方案默认预算）；之后转 H00 保存并报告，不无限循环。任何代码/依赖变化都使受影响旧验证与 Review 失效。"
+    },
+    {
+      "id": "F01",
+      "phase": "phase-g",
+      "kind": "main",
+      "title": "在批准范围内修复根因并回原检查",
+      "actor": "Main 或原 Ticket owner",
+      "trigger": "F00 原因明确，或 R03 接受诊断结论。",
+      "action": "只修相应代码、测试或环境，不删除失败测试或吞错。保留原证据。Ticket 内修复回该检查；集成或 Review 后的代码修复回 V00，再冻结新快照。",
+      "output": "可解释的最小补丁与明确重测目标。",
+      "example": "根据已核验根因做最小修复，保留原失败记录。Ticket 内回 T01/T03/T05；集成或 Review 后改了代码则回 V00，再 E00 重新审查。不要用旧通过结果放行。",
+      "edges": [
+        {
+          "label": "RED / 测试准备阶段",
+          "target": "T01",
+          "reason": "仅当 resume_node=T01。",
+          "kind": "back"
+        },
+        {
+          "label": "GREEN 阶段",
+          "target": "T03",
+          "reason": "仅当 resume_node=T03。",
+          "kind": "back"
+        },
+        {
+          "label": "非行为验证阶段",
+          "target": "T05",
+          "reason": "仅当 resume_node=T05。",
+          "kind": "back"
+        },
+        {
+          "label": "集成 / 审查 / CI 后修改了源码",
+          "target": "V00",
+          "reason": "invalidate affected checks/reviews。",
+          "kind": "back"
+        },
+        {
+          "label": "仅发布环境故障且源码未变",
+          "target": "P04",
+          "reason": "回原预发布验证，不回业务实现。",
+          "kind": "back"
+        },
+        {
+          "label": "Git/PR 操作失败，源码未变",
+          "target": "P01",
+          "reason": "先查既有远端回执，避免重复提交/PR。",
+          "kind": "back"
+        }
+      ],
+      "capability": "Main / 原 worker；必要 diagnosing-bugs",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "S03",
+      "phase": "phase-g",
+      "kind": "agent",
+      "title": "实际派发 test_diagnoser",
+      "actor": "Main → test_diagnoser",
+      "trigger": "F00 判断诊断独立且复杂。",
+      "action": "发送最小日志、命令、版本、任务范围和恢复点；使用 diagnosing-bugs 方法区分产品、测试、环境及偶发故障。只读诊断，不直接打补丁。",
+      "output": "根因组、证据、置信度、最小修复建议及真实回执。",
+      "example": "请实际启动 test_diagnoser，调用点 S03。读取本轮失败命令、日志、版本和 resume_node，使用 diagnosing-bugs 只读分析根因。不要改代码或主计划；返回证据、修复建议与真实回执，交 R03。",
+      "edges": [
+        {
+          "label": "诊断返回",
+          "target": "R03",
+          "reason": "",
+          "kind": "return"
+        },
+        {
+          "label": "无能力 / 超时 / 无进展",
+          "target": "H00",
+          "reason": "保存阻塞，不伪造根因。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "Subagent：test_diagnoser；方法 diagnosing-bugs",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "R03",
+      "phase": "phase-g",
+      "kind": "receive",
+      "title": "核验诊断并选择修复范围",
+      "actor": "Main",
+      "trigger": "S03 返回。",
+      "action": "验证根因是否能解释原始失败；证据不足不当作 Bug 已修好。确定修复由 Main 还是原 worker 执行，避免同时修改同一文件。",
+      "output": "已接受根因或明确未确定项。",
+      "example": "在 R03 验收 test_diagnoser 的运行回执、原始证据和根因链。根因成立才交 F01；不足则定向补查，超过预算保存阻塞。",
+      "edges": [
+        {
+          "label": "根因已核验",
+          "target": "F01",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "需要一次定向补证",
+          "target": "S03",
+          "reason": "不超过本任务重试预算。",
+          "kind": "back"
+        },
+        {
+          "label": "超预算 / 仍无法确定",
+          "target": "H00",
+          "reason": "",
+          "kind": "pause"
+        }
+      ],
+      "capability": "接收诊断；Main 决定",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "F02",
+      "phase": "phase-g",
+      "kind": "main",
+      "title": "处理权限、运行时或归属阻塞",
+      "actor": "Main ↔ 用户",
+      "trigger": "必要运行能力缺失、未信任、项目错位或原始修改归属未知。",
+      "action": "展示实际证据与最小必要动作。不得删除整个配置目录、替用户同意 trust 或扩权。修复运行配置后从正确项目建立新 Session；仅解决归属时回基线核验。",
+      "output": "明确的授权/配置状态或保留的 BLOCKED。",
+      "example": "请只处理当前权限/项目/归属阻塞：展示缺失证据和最小修复动作，不清理用户文件。需登录、trust 或新增权限由我决定；首次启动从 A01 重核验；已有任务从 H02 核验 checkpoint 后恢复。",
+      "edges": [
+        {
+          "label": "首次启动阻塞已解决",
+          "target": "A01",
+          "reason": "尚无业务 checkpoint 时重新核验基线；不改变用户原有文件。",
+          "kind": "back"
+        },
+        {
+          "label": "既有任务的运行 / 权限阻塞已解决",
+          "target": "H02",
+          "reason": "保留同一 task ID 和 checkpoint，核验后回原安全节点，不重新创建需求。",
+          "kind": "return"
+        },
+        {
+          "label": "等待必要人工动作",
+          "target": "H00",
+          "reason": "记录原恢复点。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "Main / 用户授权；不是业务实现",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "F03",
+      "phase": "phase-g",
+      "kind": "main",
+      "title": "可选能力降级或局部阻塞",
+      "actor": "Main",
+      "trigger": "某个可选 MCP、索引、PWF、Memory 或视觉服务不可用。",
+      "action": "按事先允许的替代策略继续：图谱可由源码取证替代；大输出可定向读取；OCR 可由完整快照审查替代；远端 Memory 可先保留本地交接。独立审查和必要 UI 验收本身不能因此取消。",
+      "output": "降级原因、等价能力证据、受影响范围；不用其他路径冒称原组件成功。",
+      "example": "请说明此可选工具失败影响哪些验收项，核验是否有已批准的等价路径。可替代就标记实际方式并回原节点；不能替代的范围保持阻塞，不宣称组件已成功调用。",
+      "edges": [
+        {
+          "label": "文档/视觉资料已有可验证替代",
+          "target": "R00",
+          "reason": "只在当前范围不依赖失败能力时；保留未完成项。",
+          "kind": "return"
+        },
+        {
+          "label": "CodeGraph 降级为源码取证",
+          "target": "B02",
+          "reason": "核对真实源码，不伪造图谱 freshness。",
+          "kind": "return"
+        },
+        {
+          "label": "OCR 降级为完整快照审查",
+          "target": "E02",
+          "reason": "覆盖完整目标；报告未使用 OCR。",
+          "kind": "return"
+        },
+        {
+          "label": "PWF 可由本地任务状态继续",
+          "target": "B00",
+          "reason": "显式切换唯一状态所有者，禁止两份主计划并写。",
+          "kind": "return"
+        },
+        {
+          "label": "context-mode 已由定向读取等价替代",
+          "target": "RESUME",
+          "reason": "回已记录的原取证/检查点，保留输出上限，不重建整条需求流程。",
+          "kind": "return"
+        },
+        {
+          "label": "缺独立 reviewer 或必要 UI 证据",
+          "target": "H00",
+          "reason": "没有等价能力就不能放行相关任务。",
+          "kind": "pause"
+        }
+      ],
+      "capability": "Fallback policy；不放松验收目标",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "F04",
+      "phase": "phase-g",
+      "kind": "stop",
+      "title": "应用发布失败：恢复应用，不升级 Harness",
+      "actor": "已授权运维工具；Main 核验",
+      "trigger": "P06 发布或健康检查失败。",
+      "action": "保留故障和当前版本；只在恢复方案与授权覆盖时恢复应用/数据并验证旧版本健康。存在不可逆迁移、新业务写入或恢复不确定时停止并请求处理。",
+      "output": "RECOVERED_PREVIOUS_VERSION 或 BLOCKED；不能声称本次新功能发布成功。",
+      "example": "应用发布失败。请按既定授权与恢复方案判断能否安全恢复；可恢复则验证旧版本健康并记录本轮发布失败。数据存在不可逆风险就停止，不执行 harness update/rollback。",
+      "edges": [
+        {
+          "label": "安全恢复并验证旧版本成功",
+          "target": "ZRECOVERED",
+          "reason": "本次发布未成功；重试需要新的具体发布决定。",
+          "kind": "next"
+        },
+        {
+          "label": "无法安全恢复 / 缺少批准",
+          "target": "ZBLOCKED",
+          "reason": "保留状态，进入明确的人工恢复处理。",
+          "kind": "next"
+        }
+      ],
+      "capability": "应用回滚 / 数据恢复；不是 Harness rollback",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "H00",
+      "phase": "phase-h",
+      "kind": "decision",
+      "title": "现在是暂停等待，还是准备跨 Session 交接？",
+      "actor": "Main Router",
+      "trigger": "任意阶段可进入；先等活跃子任务返回或明确停止，保存 checkpoint。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请暂停当前任务，等待或停止活跃子任务，并保存唯一主状态：task_id、checkpoint、版本、已执行检查、阻塞和 resume_node。是否跨 Session 决定要不要走 H01；不自动清理业务文件。",
+      "edges": [
+        {
+          "label": "暂时等待 / 同一 Session",
+          "target": "ZPAUSED",
+          "reason": "本地记录任务、版本、阻塞和安全恢复点。",
+          "kind": "next"
+        },
+        {
+          "label": "更换主 Session / 接手者",
+          "target": "H01",
+          "reason": "先本地落盘，再按需同步 PowerContext。",
+          "kind": "next"
+        },
+        {
+          "label": "用户明确取消本轮",
+          "target": "ZCANCEL",
+          "reason": "保留已有修改，不擅自 reset/删除；说明未完成范围。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "每个失败/审批等待节点必须写入其实际恢复点。暂停不是完成，也不承诺聊天关闭后自动继续执行。"
+    },
+    {
+      "id": "H01",
+      "phase": "phase-h",
+      "kind": "tool",
+      "title": "提交本地交接，并按需同步 PowerContext",
+      "actor": "Main",
+      "trigger": "H00 确认跨 Session / 接手者。",
+      "action": "先写可独立核验的本地 handoff；PowerContext 已配置且允许时提交最小摘要与来源。记录服务实际 revision；不可用时标 UNSYNCED，不能把本地文件冒充远端提交。",
+      "output": "本地交接路径、项目/任务标识、resume_node；可选远端 artifact/revision。",
+      "example": "请为本任务保存最小本地交接，核对项目和版本。已配置且获授权时通过 PowerContext 同步，返回真实 revision；失败标 UNSYNCED，不写密钥或整段聊天。",
+      "edges": [
+        {
+          "label": "本地交接完整，远端已同步或明确可选",
+          "target": "ZPAUSED",
+          "reason": "下一 Session 从 H02 核验恢复。",
+          "kind": "next"
+        },
+        {
+          "label": "用户要求远端交接，但同步未完成",
+          "target": "ZBLOCKED",
+          "reason": "保留本地安全状态；远端交接本身仍未完成。",
+          "kind": "next"
+        }
+      ],
+      "capability": "本地 Handoff；按需 PowerContext MCP",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "H02",
+      "phase": "phase-h",
+      "kind": "main",
+      "title": "从正确项目恢复，并核验当前事实",
+      "actor": "Main；用户从正确项目打开新 Session",
+      "trigger": "D00 选择恢复，或新 Session 接收交接。",
+      "action": "核对当前 runtime、repo、task ID、Git、验收和指定 handoff；远端 revision 必须真实读取。历史状态只能作依据，不能覆盖更新的源码或授权。任何发布操作恢复后都重新核验批准版本。",
+      "output": "被验证的安全恢复点，或范围/版本变化报告。",
+      "example": "请恢复本项目指定 task ID：核对运行时、Git、验收版本和本地交接；需要远端交接时实际读取指定 PowerContext revision。先判断一致性，不从旧聊天推断已完成。",
+      "edges": [
+        {
+          "label": "判断恢复路线",
+          "target": "D30",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "项目 / 权限 / 状态缺失",
+          "target": "F02",
+          "reason": "",
+          "kind": "back"
+        }
+      ],
+      "capability": "本地任务状态 / Git / 按需真实 MCP Recall",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "D30",
+      "phase": "phase-h",
+      "kind": "decision",
+      "title": "交接、当前代码与授权是否一致？",
+      "actor": "Main Router",
+      "trigger": "H02 已读取可定位证据。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请在 D30 根据当前证据判断“交接、当前代码与授权是否一致？”，说明选中的路线及理由；不要同时执行互斥分支。",
+      "edges": [
+        {
+          "label": "一致：恢复原安全检查点",
+          "target": "RESUME",
+          "reason": "必须是记录的允许节点；不凭状态直接跳到已完成。",
+          "kind": "return"
+        },
+        {
+          "label": "需求 / 风险 / 任务范围变化",
+          "target": "A02",
+          "reason": "重新分类，并重验受影响的验收。",
+          "kind": "back"
+        },
+        {
+          "label": "代码 / 依赖 / 环境变化",
+          "target": "V00",
+          "reason": "必要时先处理未完成 Ticket，再更新验证与 Review。",
+          "kind": "back"
+        },
+        {
+          "label": "仅审查证据缺失或过期",
+          "target": "E00",
+          "reason": "代码验证仍有效时重新冻结输入。",
+          "kind": "back"
+        },
+        {
+          "label": "无法确认项目或授权",
+          "target": "F02",
+          "reason": "不能冒险续写或发布。",
+          "kind": "back"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": "RESUME 是协议动作，不是 API 名：恢复点来自真实 checkpoint；提交/合并/部署等写操作必须先回对应授权门，不能直接恢复一个旧的“允许”状态。"
+    },
+    {
+      "id": "ZINFO",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "不进入开发链：回答当前问题",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "只回答非项目或解释性请求，不创建计划、派发 worker 或改变仓库。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请直接回答当前解释性问题，不运行 Harness 开发链。",
+      "edges": [],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZREPORT",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "仅审查完成：返回报告",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "返回本次快照覆盖、findings 和未验证项；不自动修复、提交、推送或发布。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请只交付审查报告，明确覆盖范围和 UNVERIFIED 项，不把报告完成等同于上线条件已满足。",
+      "edges": [],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZDONE",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "本轮完成：准确交付实际状态",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "给出已完成目标、验证、Review、交付状态和限制；新需求另从 A00 开始。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请交付本轮真实结果及证据，不补写未执行的测试或部署。",
+      "edges": [],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZPAUSED",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "已安全暂停：等待或待续接",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "保存 checkpoint；继续时先检查状态变化。暂停不等于任务失败或完成。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请报告暂停原因、保存位置和恢复入口，不宣称后台正在继续。",
+      "edges": [
+        {
+          "label": "用户明确继续 / 新 Session",
+          "target": "H02",
+          "reason": "重新核验当前事实。",
+          "kind": "return"
+        }
+      ],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZCANCEL",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "本轮取消：保留用户已有工作",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "停止本轮后续动作；保留修改和证据，清理资源另看明确授权。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "取消后请列出已经发生的改动与未完成内容，不擅自清理工作树。",
+      "edges": [],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZBLOCKED",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "阻塞：无法安全放行",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "列出缺失能力/授权、证据、影响范围和最小人工动作；已完成部分不被抹除。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请给出真实阻塞和安全恢复方式，不伪造 PASS。",
+      "edges": [
+        {
+          "label": "问题解决后用户继续",
+          "target": "H02",
+          "reason": "检查任务与版本，再回原门禁。",
+          "kind": "return"
+        }
+      ],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "ZRECOVERED",
+      "phase": "terminal",
+      "kind": "terminal",
+      "title": "旧版本已恢复：新版本发布未完成",
+      "actor": "Main",
+      "trigger": "达到该出口的真实条件",
+      "action": "明确本次发布失败且旧版本健康已验证；重试发布须重新验证和批准。",
+      "output": "明确完成范围、未完成范围、证据位置及是否还需要授权。",
+      "example": "请明确报告恢复的是旧版本，本轮新版本并未上线成功，附恢复证据。",
+      "edges": [],
+      "capability": "结果状态；不是新工具",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U10",
+      "phase": "maintenance-flow",
+      "kind": "tool",
+      "title": "只读检查安装状态、版本与候选",
+      "actor": "维护程序；Main 解读",
+      "trigger": "用户明确要求 Harness 安装、更新或 doctor。",
+      "action": "先只读审计指定 runtime、已注册能力、锁文件和归属。首次构建按安装主指令 Phase 0 开始；存在 CLI 时先 --help，再 check/doctor。",
+      "output": "实际 inventory、候选或初装缺项；不改变 accepted 环境。",
+      "example": "请先只读审计 Harness 状态。已有 CLI 则按真实 --help 执行 check/doctor；没有则按安装主指令 Phase 0 构建计划，不假称命令已存在。",
+      "edges": [
+        {
+          "label": "有安装 / 维护事项",
+          "target": "U11",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "无需变更，只回报检查结果",
+          "target": "U15",
+          "reason": "记录 CHECK_ONLY，不伪造升级。",
+          "kind": "next"
+        }
+      ],
+      "capability": "harness check / doctor；未实现时先审计",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U11",
+      "phase": "maintenance-flow",
+      "kind": "main",
+      "title": "生成明确兼容计划",
+      "actor": "Main + 维护程序",
+      "trigger": "U10 给出真实状态。",
+      "action": "列来源与固定版本、依赖、Skill 行为、配置副作用、受影响项目、候选隔离和恢复边界。缺外部事实可按 S01 研究，回 R01 后恢复本节点。",
+      "output": "准确计划 ID、目标、验证和授权要求。",
+      "example": "请生成本次安装/维护计划，固定版本与来源，列明 Hook/MCP/Skill 行为变化、受管写集、验证和恢复方式。不要 Apply；未知事实可按 S01 补证后回 U11。",
+      "edges": [
+        {
+          "label": "计划可验证，请求授权",
+          "target": "U12",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "缺少一手事实",
+          "target": "S01",
+          "reason": "resume_node=U11。",
+          "kind": "dispatch"
+        },
+        {
+          "label": "冲突 / 无法安全隔离",
+          "target": "ZBLOCKED",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "维护计划；不追逐模糊 latest",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U12",
+      "phase": "maintenance-flow",
+      "kind": "decision",
+      "title": "具体计划已获批准且风险可控吗？",
+      "actor": "Main Router",
+      "trigger": "U11 的准确计划已展示。",
+      "action": "按当前任务证据选择以下路线；分支不是按从左到右依次执行。",
+      "output": "记录选择、依据和下一节点；未满足条件不得走成功路径。",
+      "example": "请核对本次准确计划、版本、受管写集和新增权限是否获得批准；授权不覆盖未知 latest、额外账号或不可逆迁移。",
+      "edges": [
+        {
+          "label": "已有明确授权",
+          "target": "U13",
+          "reason": "仅在计划范围内构建候选。",
+          "kind": "next"
+        },
+        {
+          "label": "需要调整计划",
+          "target": "U11",
+          "reason": "先缩小范围或补齐验证与恢复方案，再请求准确授权。",
+          "kind": "back"
+        },
+        {
+          "label": "未批准 / 不可控",
+          "target": "ZBLOCKED",
+          "reason": "不更改现有环境。",
+          "kind": "next"
+        }
+      ],
+      "capability": "路由判断；不是 Skill / Subagent",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U13",
+      "phase": "maintenance-flow",
+      "kind": "tool",
+      "title": "隔离安装候选并验收",
+      "actor": "维护程序",
+      "trigger": "U12 授权具体计划。",
+      "action": "候选使用独立依赖、配置、端口和测试数据；不能在另一目录执行全局原地升级冒充隔离。验证触发、路由、Review、权限、项目隔离和恢复。",
+      "output": "candidate 报告；真实失败与未测项分列。",
+      "example": "按批准计划在独立候选环境安装并验证，覆盖路由、真实调用、配置去重和回滚演练。不要更改当前正式共享服务。",
+      "edges": [
+        {
+          "label": "候选所有必需验收通过",
+          "target": "U14",
+          "reason": "",
+          "kind": "next"
+        },
+        {
+          "label": "候选失败，正式环境未改",
+          "target": "U11",
+          "reason": "仅隔离候选并修订计划；不回滚未改变的正式环境。",
+          "kind": "back"
+        }
+      ],
+      "capability": "candidate install / smoke / fault injection",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U14",
+      "phase": "maintenance-flow",
+      "kind": "tool",
+      "title": "在获批窗口激活并验证",
+      "actor": "维护程序；Main 核验",
+      "trigger": "U13 候选通过，激活仍在批准范围内。",
+      "action": "停止相关活动依赖使用、获取锁并备份本次触碰资源；切换候选并在正确新 Session 验证实际激活。新增权限/trust 仍由用户处理。",
+      "output": "准确激活版本与功能验收证据。",
+      "example": "请在已批准窗口激活候选，不替换活动编码 Session 正在使用的依赖。完成后从正确项目新 Session 做实际验证，失败按 U16 处理。",
+      "edges": [
+        {
+          "label": "激活验证通过",
+          "target": "U15",
+          "reason": "原子接受版本。",
+          "kind": "next"
+        },
+        {
+          "label": "已改变正式环境且激活失败",
+          "target": "U16",
+          "reason": "按本事务恢复。",
+          "kind": "back"
+        },
+        {
+          "label": "新增授权超出计划",
+          "target": "ZBLOCKED",
+          "reason": "等待授权，不继续扩权。",
+          "kind": "next"
+        }
+      ],
+      "capability": "受控 promote；新 Session 验收",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U15",
+      "phase": "maintenance-flow",
+      "kind": "receive",
+      "title": "结束维护或记录已接受版本",
+      "actor": "Main + 维护程序",
+      "trigger": "U14 验证成功，或 U10 仅完成只读检查。",
+      "action": "实际更新成功才原子写 accepted lock；只读检查不修改它。给出真实组件状态、未启用能力和测试范围。",
+      "output": "CHECK_ONLY 或 ACCEPTED；来源、hash 与运行报告。",
+      "example": "请按真实路径报告 CHECK_ONLY 或 ACCEPTED。只有本候选激活验证通过才更新 accepted lock；不顺带升级其他项目或伪造未执行的测试。",
+      "edges": [
+        {
+          "label": "维护结果已记录",
+          "target": "ZDONE",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "结果记录；不是自动业务部署",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    },
+    {
+      "id": "U16",
+      "phase": "maintenance-flow",
+      "kind": "stop",
+      "title": "恢复本次受管事务",
+      "actor": "维护程序；必要时用户",
+      "trigger": "正式受管环境已被本事务更改，且激活失败。",
+      "action": "依据 journal 恢复触碰集合，避免覆盖用户原有改动与之后的新数据。数据库只能使用已演练的数据恢复方案；恢复后重验旧环境。",
+      "output": "旧环境恢复证据，或无法安全恢复的阻塞说明。",
+      "example": "请按本次 journal 判断可恢复范围。只恢复本事务受管资源并验证旧环境；不要把二进制降级当作数据库回滚，也不要覆盖用户新增数据。",
+      "edges": [
+        {
+          "label": "旧环境已恢复并验证",
+          "target": "U10",
+          "reason": "重新只读核对，不自动重试升级。",
+          "kind": "back"
+        },
+        {
+          "label": "恢复不安全 / 授权不足",
+          "target": "ZBLOCKED",
+          "reason": "",
+          "kind": "next"
+        }
+      ],
+      "capability": "harness rollback；按实际已实现接口",
+      "input_location": "Codex 主对话输入框",
+      "note": ""
+    }
+  ]
+}

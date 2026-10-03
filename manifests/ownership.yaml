@@ -1,0 +1,17 @@
+{
+  "managed_source_root": "/home/yelei/文档/gpt/linux/codex-engineering-harness",
+  "state_root": "~/.local/share/codex-engineering-harness",
+  "ownership_rule": "Exact transaction touch_set only; unknown content never overwritten; post-transaction user modifications block rollback",
+  "registration_owners": {
+    "matt-skills": "Harness project overlay",
+    "planning-with-files": "Harness project overlay",
+    "context-mode": "Harness project MCP",
+    "powercontext": "Harness project MCP",
+    "codegraph": "Harness project MCP",
+    "open-code-review": "Harness project skill",
+    "markitdown": "Harness project MCP",
+    "screenshot-to-code": "loopback sidecar"
+  },
+  "user_config": "No global Codex configuration changes authorized by this installation route; existing Interrupt hook retained",
+  "sources_lock": "reports/upstream-lock.json"
+}

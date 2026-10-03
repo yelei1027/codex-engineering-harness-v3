@@ -1,0 +1,5 @@
+interface:
+  display_name: Harness Maintain
+  short_description: Maintain Harness candidates and safe recovery
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,5 @@
+interface:
+  display_name: Harness Doctor
+  short_description: Inspect Harness binding and verification health
+policy:
+  allow_implicit_invocation: true

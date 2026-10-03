@@ -1,0 +1,16 @@
+{
+  "codex_binary": "/usr/lib/chatgpt/resources/codex",
+  "codex_version": "0.159.2",
+  "older_path_binary": "/snap/codex/34/bin/codex 0.114.0",
+  "plugin_format": "portable with Codex compatibility manifest; lean staging root",
+  "registration": "project skills and project config MCP; catalog plugin installation is an alternative, never simultaneous skill registration",
+  "context_mode": "MCP-only; npm postinstall suppressed to preserve unrelated plugin configuration; Node24 builtin SQLite functional smoke passed",
+  "matt_orchestrators": {
+    "implement": "EXPLICIT_ONLY; reviews and commits internally",
+    "implement-spec": "EXPLICIT_ONLY; UPSTREAM_ORCHESTRATOR; children count in host budget"
+  },
+  "planning_with_files": "project L2 standalone hooks; no global PWF hooks; native user trust remains required",
+  "powercontext": "Basic explicit Handoff via loopback Docker; no generation or embeddings configured",
+  "screenshot_to_code": "locked Docker frontend/backend + Chromium; provider generation not enabled",
+  "schema_status": "runtime plugin add validated, application UI @ entry not verified"
+}

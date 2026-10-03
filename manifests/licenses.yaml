@@ -1,0 +1,69 @@
+{
+  "harness_license": "MIT",
+  "third_party": [
+    {
+      "component": "matt-skills",
+      "license": "MIT",
+      "files": [
+        "third-party-licenses/matt-skills/LICENSE"
+      ],
+      "source": "https://github.com/mattpocock/skills.git"
+    },
+    {
+      "component": "planning-with-files",
+      "license": "MIT",
+      "files": [
+        "third-party-licenses/planning-with-files/LICENSE"
+      ],
+      "source": "https://github.com/OthmanAdi/planning-with-files.git"
+    },
+    {
+      "component": "context-mode",
+      "license": "Elastic-2.0",
+      "files": [
+        "third-party-licenses/context-mode/LICENSE"
+      ],
+      "source": "https://github.com/mksglu/context-mode.git"
+    },
+    {
+      "component": "powercontext",
+      "license": "Apache-2.0",
+      "files": [
+        "third-party-licenses/powercontext/LICENSE"
+      ],
+      "source": "https://github.com/oceanbase/powercontext.git"
+    },
+    {
+      "component": "codegraph",
+      "license": "MIT",
+      "files": [
+        "third-party-licenses/codegraph/LICENSE"
+      ],
+      "source": "https://github.com/colbymchenry/codegraph.git"
+    },
+    {
+      "component": "open-code-review",
+      "license": "Apache-2.0",
+      "files": [
+        "third-party-licenses/open-code-review/LICENSE"
+      ],
+      "source": "https://github.com/alibaba/open-code-review.git"
+    },
+    {
+      "component": "markitdown",
+      "license": "MIT",
+      "files": [
+        "third-party-licenses/markitdown/LICENSE"
+      ],
+      "source": "https://github.com/microsoft/markitdown.git"
+    },
+    {
+      "component": "screenshot-to-code",
+      "license": "MIT",
+      "files": [
+        "third-party-licenses/screenshot-to-code/LICENSE"
+      ],
+      "source": "https://github.com/abi/screenshot-to-code.git"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+services:
+  powercontext:
+    image: codex-harness-powercontext:6b2f6e8
+    container_name: codex-harness-powercontext
+    env_file: .env
+    ports:
+      - "127.0.0.1:${POWERCONTEXT_PORT:-18080}:8000"
+    volumes:
+      - powercontext-data:/data
+    restart: unless-stopped
+volumes:
+  powercontext-data:
+    name: codex-harness-powercontext-data

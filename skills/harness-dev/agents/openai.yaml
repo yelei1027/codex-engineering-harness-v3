@@ -1,0 +1,5 @@
+interface:
+  display_name: Harness Dev
+  short_description: Route enabled project development and review
+policy:
+  allow_implicit_invocation: true

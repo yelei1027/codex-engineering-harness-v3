@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@alibaba-group/open-code-review": "^1.12.11",
+    "@colbymchenry/codegraph": "^1.6.1",
+    "context-mode": "^1.0.169"
+  }
+}

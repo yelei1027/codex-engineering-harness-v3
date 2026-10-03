@@ -1,0 +1,49 @@
+{
+  "version": "3.0.0",
+  "sources": {
+    "codegraph": {
+      "source": "https://github.com/colbymchenry/codegraph.git",
+      "commit": "70fe0ecc52751c5a3f8a0912388411bd61e5de13",
+      "readme_sha256": "eb84996efef40925f8a1acea1978537d18a3d1560e960e76ef7b081e5c03a071"
+    },
+    "powercontext": {
+      "source": "https://github.com/oceanbase/powercontext.git",
+      "commit": "6b2f6e8a4c1aac59fca75662aca26d78748bfa29",
+      "readme_sha256": "48255a06e14daf57f51c34a47c97c36b7108a9c823a90de19b78d876c93e7aab"
+    },
+    "context-mode": {
+      "source": "https://github.com/mksglu/context-mode.git",
+      "commit": "9f3ecc8b0aafd25d3592ffc31e4b02b1767f6089",
+      "readme_sha256": "9308e09043c4746340662e7a72e68de155fc28d70a1dd316f5ff292596076d04"
+    },
+    "markitdown": {
+      "source": "https://github.com/microsoft/markitdown.git",
+      "commit": "d9cae89636ac1e9f90deb5dad2f5ef069d7f35be",
+      "readme_sha256": "9f9dc0e582d066e8ac671a1f63b3a73c70a7be9909e8be51a7f5aeb5a7c04af2"
+    },
+    "screenshot-to-code": {
+      "source": "https://github.com/abi/screenshot-to-code.git",
+      "commit": "d026163f586dfa8c5c10d28c36edd59a9d3b0e88",
+      "readme_sha256": "a728506f78f76cbe602ae83805be2516b4c0b03763de09a64184fc96bb619c06"
+    },
+    "planning-with-files": {
+      "source": "https://github.com/OthmanAdi/planning-with-files.git",
+      "commit": "dab9d16fbd9314448b319d112e99f497d7638d89",
+      "readme_sha256": "84135ca0db750b4f9fa35af15b96d2e74c577935c9c299c9d9ff32c2f238aeb9"
+    },
+    "matt-skills": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "readme_sha256": "a0ec5e84e3412c62340b17ce641aa6be96988f9e89e967bbce7c1c0597dae333"
+    },
+    "open-code-review": {
+      "source": "https://github.com/alibaba/open-code-review.git",
+      "commit": "a758d9cbfb689937c7857ad64b2dd66adb58c0c2",
+      "readme_sha256": "76228cb397c4e64a13fa03ee893ae8a46df310f7073bd690e7ad0dc6cfc1aa43"
+    }
+  },
+  "npm_lock": "manifests/node/package-lock.json",
+  "python_lock": "manifests/markitdown-requirements.lock",
+  "sidecar_locks": "vendor/powercontext/uv.lock and screenshot backend/poetry.lock, frontend/pnpm-lock.yaml",
+  "offline_install": "UNVERIFIED"
+}

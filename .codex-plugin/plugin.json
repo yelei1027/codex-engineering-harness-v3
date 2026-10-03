@@ -1,0 +1,20 @@
+{
+  "name": "codex-engineering-harness",
+  "version": "3.0.0",
+  "description": "Project-scoped Codex engineering workflows",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Engineering Harness",
+    "shortDescription": "Project-scoped engineering workflow and verification",
+    "longDescription": "Main Router coordinates bounded methods, source snapshots, review and project recovery. MCP registration belongs to project config. Lifecycle hooks are inactive by default; a trusted project L2 profile may opt in.",
+    "developerName": "Local Harness",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use Codex Engineering Harness to develop or review the enabled project."
+    ]
+  }
+}

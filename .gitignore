@@ -1,0 +1,16 @@
+vendor/
+runtimes/
+private/
+.test-projects/
+machine-binding.json
+services-binding.json
+.harness-install/
+dist/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.sqlite*
+*.db
+.harness/
+.harness-artifacts/

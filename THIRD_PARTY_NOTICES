@@ -1,0 +1,28 @@
+Harness implementation: MIT. Each vendored component retains its own license.
+
+matt-skills: MIT
+Source: https://github.com/mattpocock/skills.git
+License files: third-party-licenses/matt-skills/LICENSE
+planning-with-files: MIT
+Source: https://github.com/OthmanAdi/planning-with-files.git
+License files: third-party-licenses/planning-with-files/LICENSE
+context-mode: Elastic-2.0
+Source: https://github.com/mksglu/context-mode.git
+License files: third-party-licenses/context-mode/LICENSE
+powercontext: Apache-2.0
+Source: https://github.com/oceanbase/powercontext.git
+License files: third-party-licenses/powercontext/LICENSE
+codegraph: MIT
+Source: https://github.com/colbymchenry/codegraph.git
+License files: third-party-licenses/codegraph/LICENSE
+open-code-review: Apache-2.0
+Source: https://github.com/alibaba/open-code-review.git
+License files: third-party-licenses/open-code-review/LICENSE
+markitdown: MIT
+Source: https://github.com/microsoft/markitdown.git
+License files: third-party-licenses/markitdown/LICENSE
+screenshot-to-code: MIT
+Source: https://github.com/abi/screenshot-to-code.git
+License files: third-party-licenses/screenshot-to-code/LICENSE
+
+Transitive npm package licenses are recorded in manifests/node/package-lock.json and remain in installed package directories. Python/Docker dependency licenses remain with their distributions. This source archive is not an offline binary bundle.

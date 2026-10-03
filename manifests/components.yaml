@@ -1,0 +1,166 @@
+{
+  "components": [
+    {
+      "source": "https://github.com/mattpocock/skills.git",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "readme_sha256": "a0ec5e84e3412c62340b17ce641aa6be96988f9e89e967bbce7c1c0597dae333",
+      "name": "matt-skills",
+      "resolved_version": "commit:d81f3a183412",
+      "install_route": "copied scoped skills",
+      "registration_owner": "Harness project overlay",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "none registered",
+      "mcp_servers": [],
+      "evidence": [
+        "skill-static-validation.json",
+        "trigger-smoke.json"
+      ],
+      "accepted_status": "SKILLS_STATIC_PASS_NATIVE_ACCEPTANCE_SEPARATE_REPORT"
+    },
+    {
+      "source": "https://github.com/OthmanAdi/planning-with-files.git",
+      "commit": "dab9d16fbd9314448b319d112e99f497d7638d89",
+      "readme_sha256": "84135ca0db750b4f9fa35af15b96d2e74c577935c9c299c9d9ff32c2f238aeb9",
+      "name": "planning-with-files",
+      "resolved_version": "3.22.0",
+      "install_route": "project skill; L2 standalone Codex hooks",
+      "registration_owner": "Harness project overlay",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "L2 profile only; PENDING_TRUST",
+      "mcp_servers": [],
+      "evidence": [
+        "skill-static-validation.json",
+        "pwf-disabled-smoke.json"
+      ],
+      "accepted_status": "SKILL_STATIC_PASS_DISABLED_GUARD_PASS_L2_HOOK_PENDING_TRUST",
+      "smoke_result": "PLANNING_DISABLED=1 exits without reading/writing fixture plan"
+    },
+    {
+      "source": "https://github.com/mksglu/context-mode.git",
+      "commit": "9f3ecc8b0aafd25d3592ffc31e4b02b1767f6089",
+      "readme_sha256": "9308e09043c4746340662e7a72e68de155fc28d70a1dd316f5ff292596076d04",
+      "name": "context-mode",
+      "resolved_version": "1.0.169",
+      "install_route": "npm pinned independent prefix, MCP-only",
+      "registration_owner": "Harness project MCP",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "none registered",
+      "mcp_servers": [
+        "context-mode"
+      ],
+      "evidence": [
+        "mcp-context-mode.json"
+      ],
+      "accepted_status": "FUNCTIONAL_SMOKE_PASS"
+    },
+    {
+      "source": "https://github.com/oceanbase/powercontext.git",
+      "commit": "6b2f6e8a4c1aac59fca75662aca26d78748bfa29",
+      "readme_sha256": "48255a06e14daf57f51c34a47c97c36b7108a9c823a90de19b78d876c93e7aab",
+      "name": "powercontext",
+      "resolved_version": "0.0.0+g6b2f6e8 (source commit locked)",
+      "install_route": "Docker locked uv dependencies, Basic explicit Handoff",
+      "registration_owner": "Harness project MCP",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "optional generation key",
+      "hooks": "none registered",
+      "mcp_servers": [
+        "powercontext"
+      ],
+      "evidence": [
+        "powercontext-smoke.json",
+        "powercontext-mcp.json"
+      ],
+      "accepted_status": "BASIC_PASS_FULL_PLUGIN_NOT_ENABLED",
+      "smoke_result": "BASIC_HANDOFF_NEW_CLIENT_RECALL_AND_47_MCP_TOOLS_PASS",
+      "sidecars": {
+        "image": "sha256:249e1712bcd246cf8915a3ec3bd204e6697d2875ddf60e5498c19a787cc2672c",
+        "port": "loopback18080"
+      }
+    },
+    {
+      "source": "https://github.com/colbymchenry/codegraph.git",
+      "commit": "70fe0ecc52751c5a3f8a0912388411bd61e5de13",
+      "readme_sha256": "eb84996efef40925f8a1acea1978537d18a3d1560e960e76ef7b081e5c03a071",
+      "name": "codegraph",
+      "resolved_version": "1.6.1",
+      "install_route": "npm pinned self-contained CLI; MCP",
+      "registration_owner": "Harness project MCP",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "none registered",
+      "mcp_servers": [
+        "codegraph"
+      ],
+      "evidence": [
+        "mcp-codegraph.json",
+        "mcp-codegraph-autosync.json"
+      ],
+      "accepted_status": "FUNCTIONAL_SMOKE_PASS"
+    },
+    {
+      "source": "https://github.com/alibaba/open-code-review.git",
+      "commit": "a758d9cbfb689937c7857ad64b2dd66adb58c0c2",
+      "readme_sha256": "76228cb397c4e64a13fa03ee893ae8a46df310f7073bd690e7ad0dc6cfc1aa43",
+      "name": "open-code-review",
+      "resolved_version": "1.12.11",
+      "install_route": "npm pinned native binary, Delegation Mode skill",
+      "registration_owner": "Harness project skill",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "none registered",
+      "mcp_servers": [],
+      "evidence": [
+        "ocr-workspace.json",
+        "ocr-rules.json",
+        "ocr-smoke.json"
+      ],
+      "accepted_status": "DELEGATION_SELECTION_PASS_REVIEW_PENDING",
+      "smoke_result": "CLEAN_RANGE_AND_DIRTY_WORKSPACE_DELEGATION_PASS"
+    },
+    {
+      "source": "https://github.com/microsoft/markitdown.git",
+      "commit": "d9cae89636ac1e9f90deb5dad2f5ef069d7f35be",
+      "readme_sha256": "9f9dc0e582d066e8ac671a1f63b3a73c70a7be9909e8be51a7f5aeb5a7c04af2",
+      "name": "markitdown",
+      "resolved_version": "0.1.8 / MCP 0.0.1a7",
+      "install_route": "locked source independent Python 3.12 env; STDIO",
+      "registration_owner": "Harness project MCP",
+      "scope": "PROJECT_SCOPED",
+      "credentials_required": "none",
+      "hooks": "none registered",
+      "mcp_servers": [
+        "markitdown"
+      ],
+      "evidence": [
+        "mcp-markitdown.json"
+      ],
+      "accepted_status": "FUNCTIONAL_SMOKE_PASS"
+    },
+    {
+      "source": "https://github.com/abi/screenshot-to-code.git",
+      "commit": "d026163f586dfa8c5c10d28c36edd59a9d3b0e88",
+      "readme_sha256": "a728506f78f76cbe602ae83805be2516b4c0b03763de09a64184fc96bb619c06",
+      "name": "screenshot-to-code",
+      "resolved_version": "commit:d026163f586d",
+      "install_route": "Docker separate frontend/backend; optional generation provider",
+      "registration_owner": "loopback sidecar",
+      "scope": "MACHINE_LOCAL_SIDECAR",
+      "credentials_required": "optional generation key",
+      "hooks": "none registered",
+      "mcp_servers": [],
+      "evidence": [
+        "screenshot-preview.png"
+      ],
+      "accepted_status": "PASS_WITH_OPTIONAL_PROVIDER_BLOCK",
+      "smoke_result": "BACKEND_FRONTEND_PROXY_AND_CHROMIUM_RENDER_PASS",
+      "sidecars": {
+        "screenshot-backend": "sha256:314267bcf073df3d114cf1b1f8620504194fa7b3ad023e2b04d0dedd42a6747f",
+        "screenshot-frontend": "sha256:b3f9314c739d692cc28b6c400cde4c109c596215a6a80e8cb571cc366e40c8eb"
+      }
+    }
+  ]
+}

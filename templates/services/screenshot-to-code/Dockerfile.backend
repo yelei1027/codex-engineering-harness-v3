@@ -1,0 +1,10 @@
+FROM python@sha256:afc139a0a640942491ec481ad8dda10f2c5b753f5c969393b12480155fe15a63
+ENV POETRY_VERSION=1.8.0 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN pip install "poetry==1.8.0" && poetry config virtualenvs.create true && poetry config virtualenvs.in-project true
+COPY backend/poetry.lock backend/pyproject.toml ./
+RUN poetry install --only main --no-root --no-interaction
+RUN poetry run playwright install --with-deps chromium
+COPY backend/ ./
+EXPOSE 7001
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7001"]

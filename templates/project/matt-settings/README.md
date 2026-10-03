@@ -1,0 +1,1 @@
+项目启用时检查现有 docs/agents/issue-tracker.md 和 domain.md，保留用户配置。本目录是从锁定 Matt setup skill 提取的本地 Markdown tracker 模板，只有项目选择本地 tracker 后才合并缺失文件；不代表已获远端 issue 写权限。tdd 仍需已确认 seam。code-review 必须提供真实 fixed point 和 spec 来源。

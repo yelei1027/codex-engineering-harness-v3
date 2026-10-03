@@ -1,0 +1,493 @@
+{
+  "schema_version": 1,
+  "harness_version": "3.0.0",
+  "registration_owner": "project binding chooses single plugin or standalone skills source, never both",
+  "runtime_selection": "UNVERIFIED",
+  "skills": [
+    {
+      "name": "grill-with-docs",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/grill-with-docs",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "7de372c13488f1ee96cc11cd8907b56b6809cc93eef776eeddd37de6b6cbe3fe",
+      "installed_sha256": "8eb7f3a2f2702143ae6a981a2cc0ebad75765c8a04acd8594f62b995910c94d8",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "children": [
+          "grilling",
+          "domain-modeling"
+        ],
+        "settings": [
+          "GLOSSARY.md",
+          "docs/adr/"
+        ]
+      }
+    },
+    {
+      "name": "wayfinder",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/wayfinder",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "fee6e1d0c50f0e736b4ef8a599060c959afae904c9a97d82c97f049fcc3aa0f1",
+      "installed_sha256": "8839efedabf042b08c41b2b65b541992befacf37c4546ac5b396ab90b1d3290e",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "children": [
+          "research when external facts needed",
+          "prototype when interactive artifact needed",
+          "grilling",
+          "domain-modeling"
+        ],
+        "settings": [
+          "docs/agents/issue-tracker.md"
+        ],
+        "remote_side_effects": "Issue creation/commenting/closing depend on chosen tracker and authorization"
+      }
+    },
+    {
+      "name": "codebase-design",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/codebase-design",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2",
+      "installed_sha256": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "research",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/research",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "985569f15739c713d6784887c3d186d4ef9ac85bec5ad9c068d25bf0739928e4",
+      "installed_sha256": "985569f15739c713d6784887c3d186d4ef9ac85bec5ad9c068d25bf0739928e4",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "to-spec",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/to-spec",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "43ad9cf318e5e7d3d1fa360253a37021796dc87a0c2e595ad262661a10f85088",
+      "installed_sha256": "d01a31632672a3ac7ff6d773f97be45f6a2f330c5e04b9f68a87c99947a64d18",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "to-tickets",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/to-tickets",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "5c9fba69845c2519b9b35b9af42ae5142c21f8ca15ac2123dc2722002c8058ae",
+      "installed_sha256": "498918c2cf481d023f0e11b183580d4d93bd7f104a3f1970ecb4cc69e5cae1f9",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "tdd",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/tdd",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "93ea419b76e9caaf26153b828e984f7c3fb136f4caa67b14af95f32ea965a1cc",
+      "installed_sha256": "93ea419b76e9caaf26153b828e984f7c3fb136f4caa67b14af95f32ea965a1cc",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "RED_GREEN_REFERENCE",
+        "commit": false,
+        "children": [],
+        "seams": "User confirms public seams before tests; codebase-design consulted when interface is unsettled",
+        "loop": "One observable failing test then minimal implementation; refactor at review stage"
+      }
+    },
+    {
+      "name": "diagnosing-bugs",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/diagnosing-bugs",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "9168404abda0967a5d32977e3498cd95fda6807018852f3de736a78357c82b40",
+      "installed_sha256": "9168404abda0967a5d32977e3498cd95fda6807018852f3de736a78357c82b40",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "code-review",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/code-review",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "47f4e52c21694def9c7c11cbfbf891ca35eac7a93e395797515be3c8a409ae50",
+      "installed_sha256": "47f4e52c21694def9c7c11cbfbf891ca35eac7a93e395797515be3c8a409ae50",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "TWO_AXIS_REVIEW",
+        "children": [
+          "Standards",
+          "Spec (unless no spec)"
+        ],
+        "concurrency": "Parallel actual subagents counted against host budget",
+        "fixed_point": "Resolve user fixed point, non-empty git diff FIXED...HEAD; git log FIXED..HEAD",
+        "dirty_limit": "Upstream HEAD-based review cannot cover dirty/mixed alone; use unified frozen snapshot fallback",
+        "settings": [
+          "docs/agents/issue-tracker.md",
+          "spec source",
+          "repository standards"
+        ]
+      }
+    },
+    {
+      "name": "pr",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/pr",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "ab63f1cf78647389edcd386c9427c5dfca27ed2836930c24773ffee834c19bcd",
+      "installed_sha256": "ab63f1cf78647389edcd386c9427c5dfca27ed2836930c24773ffee834c19bcd",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "retro",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/retro",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "33fbc28568e3146f20fd908b12998bc0ab30aa4f4c87288199a40793efa94696",
+      "installed_sha256": "3a9ba9c0617bd3305505e8eaa5b7c70778dc785928bd5ffb10988f65858b28c7",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "children": [
+          "writing-for-agents"
+        ],
+        "side_effects": "Suggests environment improvement; implement as separate scoped work"
+      }
+    },
+    {
+      "name": "implement",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/implement",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "6d3fd9e83b8f36e5213854779db49b256a457a7ebb4a503e53fa7dcff696adc3",
+      "installed_sha256": "7676ab1330b147103e4dd4a29c69ddadc6facf434afd5cc293194a2743992e16",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "classification": "UPSTREAM_IMPLEMENTER",
+        "review": "Calls code-review at end",
+        "commit": "Commits current branch",
+        "nested_orchestration": false,
+        "permission_gate": "X00 requires review/commit permission before invocation; no automatic outer worker dispatch"
+      }
+    },
+    {
+      "name": "implement-spec",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/implement-spec",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "7a22dd2e60b8fcece478ced9d2533582adf3520d695acd3ab715341535c9e56d",
+      "installed_sha256": "8d6aae057b20a0b34cd98e5350ff18e18ba6e67408f01db1211d18f07f7b9d5b",
+      "allow_implicit_invocation": false,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "disable-model-invocation"
+      ],
+      "upstream_frontmatter_removed": {
+        "disable-model-invocation": true
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "classification": "UPSTREAM_ORCHESTRATOR",
+        "review": "Calls code-review on integration branch; fixes using implementer",
+        "commit": "Creates branches/worktrees, merges integration and worker branches, may create draft PR and close tickets",
+        "nested_orchestration": true,
+        "children": [
+          "exploration (optional)",
+          "implementer per ticket",
+          "merger",
+          "code-review internal Standards/Spec"
+        ],
+        "permission_gate": "Only explicit X00; authorize complete write set and remote operations before invocation; suspend duplicate outer orchestration"
+      }
+    },
+    {
+      "name": "domain-modeling",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/domain-modeling",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "7b925d7b1e341a2eeae33ad68a8a8c0ab889a38ddd22a7598e4c240e5a7556a3",
+      "installed_sha256": "7b925d7b1e341a2eeae33ad68a8a8c0ab889a38ddd22a7598e4c240e5a7556a3",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "prototype",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/engineering/prototype",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "714de632d116bb73f65cdb5a882db15b9369a6713b9a47c0fad827848f0bfbe3",
+      "installed_sha256": "714de632d116bb73f65cdb5a882db15b9369a6713b9a47c0fad827848f0bfbe3",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "grilling",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/productivity/grilling",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+      "installed_sha256": "10ff989e7498b23b5acb49d5048f11dcd906757d2f79c5cdf8a00001381296f2",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "writing-for-agents",
+      "component": "matt-skills",
+      "source": "vendor/matt-skills/skills/productivity/writing-for-agents",
+      "commit": "d81f3a183412e71a5b1e84ca21bc1a35eea03a60",
+      "upstream_sha256": "551adca942227b44192edba88acd4e8db911f0121ce58ad16944ccf6a896a74a",
+      "installed_sha256": "551adca942227b44192edba88acd4e8db911f0121ce58ad16944ccf6a896a74a",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [],
+      "upstream_frontmatter_removed": {},
+      "adaptation": "Byte-identical upstream copy.",
+      "behavior": {
+        "classification": "METHOD",
+        "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
+      }
+    },
+    {
+      "name": "planning-with-files",
+      "component": "planning-with-files",
+      "source": "vendor/planning-with-files/skills/planning-with-files",
+      "commit": "dab9d16fbd9314448b319d112e99f497d7638d89",
+      "upstream_sha256": "0cdcae144dba961c7eaaf45d29512bc78cec28692da14b59a4279dbe24fe93b1",
+      "installed_sha256": "cf51e1e067f2232def40aa3f740bfd10cecfdfbcc3ee5b9ab8756ced2436335a",
+      "allow_implicit_invocation": true,
+      "body_preserved": false,
+      "removed_frontmatter_fields": [
+        "user-invocable",
+        "hooks"
+      ],
+      "upstream_frontmatter_removed": {
+        "user-invocable": true,
+        "hooks": {
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && exit 0; SH=\"${CLAUDE_SKILL_DIR}/scripts/skill-hook.sh\"; [ -f \"$SH\" ] || SH=$(ls \"$HOME/.claude/skills/planning-with-files/scripts/skill-hook.sh\" \"$HOME/.claude/plugins/marketplaces/planning-with-files/scripts/skill-hook.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && [ -f \"$SH\" ] && sh \"$SH\" --event=userprompt; exit 0"
+                }
+              ]
+            }
+          ],
+          "PreToolUse": [
+            {
+              "matcher": "Write|Edit|Bash|Read|Glob|Grep",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && exit 0; SH=\"${CLAUDE_SKILL_DIR}/scripts/skill-hook.sh\"; [ -f \"$SH\" ] || SH=$(ls \"$HOME/.claude/skills/planning-with-files/scripts/skill-hook.sh\" \"$HOME/.claude/plugins/marketplaces/planning-with-files/scripts/skill-hook.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && [ -f \"$SH\" ] && sh \"$SH\" --event=pretool; exit 0"
+                }
+              ]
+            }
+          ],
+          "PostToolUse": [
+            {
+              "matcher": "Write|Edit",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && exit 0; SH=\"${CLAUDE_SKILL_DIR}/scripts/skill-hook.sh\"; [ -f \"$SH\" ] || SH=$(ls \"$HOME/.claude/skills/planning-with-files/scripts/skill-hook.sh\" \"$HOME/.claude/plugins/marketplaces/planning-with-files/scripts/skill-hook.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && [ -f \"$SH\" ] && sh \"$SH\" --event=posttool; exit 0"
+                }
+              ]
+            }
+          ],
+          "Stop": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && exit 0; SH=\"${CLAUDE_SKILL_DIR}/scripts/skill-hook.sh\"; [ -f \"$SH\" ] || SH=$(ls \"$HOME/.claude/skills/planning-with-files/scripts/skill-hook.sh\" \"$HOME/.claude/plugins/marketplaces/planning-with-files/scripts/skill-hook.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && [ -f \"$SH\" ] && sh \"$SH\" --event=stop; exit 0"
+                }
+              ]
+            }
+          ],
+          "PreCompact": [
+            {
+              "matcher": "*",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "[ -n \"${CLAUDE_PLUGIN_ROOT:-}\" ] && exit 0; SH=\"${CLAUDE_SKILL_DIR}/scripts/skill-hook.sh\"; [ -f \"$SH\" ] || SH=$(ls \"$HOME/.claude/skills/planning-with-files/scripts/skill-hook.sh\" \"$HOME/.claude/plugins/marketplaces/planning-with-files/scripts/skill-hook.sh\" 2>/dev/null | head -1); [ -n \"$SH\" ] && [ -f \"$SH\" ] && sh \"$SH\" --event=precompact; exit 0"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "adaptation": "Canonical skill-only copy, inactive hook header removed, L2 description and explicit no-hooks/path/profile preamble. Original body retained below preamble.",
+      "behavior": {
+        "hooks": "NOT_REGISTERED; canonical skill only",
+        "selection": "L2/long tasks selected by Main",
+        "plan_owner": "Main only; workers use separate ledgers",
+        "session_history": "Explicit user request only"
+      }
+    },
+    {
+      "name": "open-code-review-delegate",
+      "component": "open-code-review",
+      "source": "vendor/open-code-review/skills/open-code-review-delegate",
+      "commit": "a758d9cbfb689937c7857ad64b2dd66adb58c0c2",
+      "upstream_sha256": "20828a50b05465496468c733270be2256c7764d2e5c29181a7706c58cfc64087",
+      "installed_sha256": "af3f934f21f4725c23cd880a3cf3efba1415f222aa460e18f583bd253bda3acd",
+      "allow_implicit_invocation": true,
+      "body_preserved": true,
+      "removed_frontmatter_fields": [
+        "compatibility"
+      ],
+      "upstream_frontmatter_removed": {
+        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint — delegation mode is LLM-free on the OCR side.\n"
+      },
+      "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
+      "behavior": {
+        "llm": "Host reviews; OCR only deterministic file/rule resolution",
+        "children": [],
+        "dirty_limit": "Workspace preview alone omits earlier committed task changes; pair unified snapshot and task-base range",
+        "review_only": "Do not apply optional fixes without review-and-fix authorization"
+      }
+    },
+    {
+      "name": "harness-dev",
+      "component": "harness",
+      "source": "local V3 contract",
+      "installed_sha256": "c3c56cceaa9645699a9609927c280e89b667795860965bfc7c438876da9b3e18",
+      "allow_implicit_invocation": true,
+      "runtime_selection": "UNVERIFIED"
+    },
+    {
+      "name": "harness-doctor",
+      "component": "harness",
+      "source": "local V3 contract",
+      "installed_sha256": "fc6424f4afbc8d5a72671f8d6921c1b0f06faead201dbc74a811d1c96f1119b8",
+      "allow_implicit_invocation": true,
+      "runtime_selection": "UNVERIFIED"
+    },
+    {
+      "name": "harness-maintain",
+      "component": "harness",
+      "source": "local V3 contract",
+      "installed_sha256": "a75f155fd20f57528210d28ae71402762f9c9b5bf08a96c0ceace78603d96ba9",
+      "allow_implicit_invocation": true,
+      "runtime_selection": "UNVERIFIED"
+    }
+  ]
+}
