@@ -3,7 +3,7 @@
 面向 Codex / Vibe Coding 的项目级开发 Harness。
 核心目标：**一台机器安装一次，每个项目一条命令启用；Skill、MCP、Hook、Subagent 按需自动路由。**
 
-> 当前稳定版：`v3.1.0` · Linux x86_64 · Codex Desktop
+> 当前稳定版：`v3.1.1` · Linux x86_64 · Codex Desktop
 > 正式状态：`PASS_WITH_OPTIONAL_BLOCK`（核心能力已通过；可选模型 Provider 不影响日常开发）
 
 ## 核心能力
@@ -52,7 +52,7 @@ gh api repos/yelei1027/codex-engineering-harness-v3/contents/scripts/install-rel
 默认安装目录：
 
 ```text
-~/.local/share/codex-engineering-harness/releases/3.1.0
+~/.local/share/codex-engineering-harness/releases/3.1.1
 ```
 
 安装完成后验证：
@@ -157,7 +157,7 @@ harness init --profile L1
 | Context 状态 | `harness context status .` |
 | 保存 Handoff | `harness context handoff . --task TASK_ID` |
 | 恢复 Handoff | `harness context recall . --task TASK_ID` |
-| 禁用某个项目 | `harness disable "/项目路径"` |
+| 禁用当前项目 | `harness disable` 或 `harness disable .` |
 | 卸载共享 Harness | `harness uninstall` |
 
 ---
@@ -195,11 +195,14 @@ harness update --help
 
 ## 6. 卸载
 
-先禁用已启用的项目：
+先进入各个已启用项目的任意目录并禁用；不要求必须位于 Git 根目录：
 
 ```bash
-harness disable "/项目A路径"
-harness disable "/项目B路径"
+cd "/项目A任意子目录"
+harness disable
+
+cd "/项目B任意子目录"
+harness disable
 ```
 
 然后卸载共享 launcher：
@@ -254,10 +257,9 @@ PowerContext Full 自动 Memory、Embedding / Hybrid Search 是可选增强，�
 当前正式包：
 
 ```text
-v3.1.0
-codex-engineering-harness-3.1.0-linux-x86_64.tar.gz
-SHA256:
-cac560ce0bedb1c31fab33a51e9689d71234593ded694ceeda8f7b53e262063c
+v3.1.1
+codex-engineering-harness-3.1.1-linux-x86_64.tar.gz
+SHA256：以同一 Release 中的 .sha256 附件为准；一键安装器会自动校验。
 ```
 
 仓库与 Release 均为 Private。

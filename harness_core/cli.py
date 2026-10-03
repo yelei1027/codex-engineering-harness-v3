@@ -44,6 +44,23 @@ def defaults():
 def registry():
     return read_json(state_dir()/'projects.json',{})
 
+def registered_project(value):
+    """Resolve an enabled project from its root or any descendant path."""
+    path=Path(value).expanduser().resolve()
+    if not path.is_dir():raise HarnessError('Project directory does not exist: '+str(path))
+    projects=registry();matches=[]
+    for name in projects:
+        root=Path(name).expanduser().resolve()
+        if path==root or root in path.parents:matches.append(root)
+    if matches:
+        return max(matches,key=lambda item:len(item.parts))
+    # Preserve idempotent disable for a valid Git project that is simply not enabled.
+    probe=run(['git','-C',path,'rev-parse','--show-toplevel'],ok=False)
+    if probe.returncode==0:
+        return Path(probe.stdout.decode().strip()).resolve()
+    available='\n'.join('- '+name for name in sorted(projects)) or '- (none)'
+    raise HarnessError('Current path is not inside an enabled Harness project: '+str(path)+'\nEnabled projects:\n'+available)
+
 def project_binding(repo):
     value=read_json(repo/'.harness/state/project.json')
     if not value:
@@ -249,7 +266,8 @@ def enable(repo,profile):
         tx.change(state_dir()/'projects.json',canonical(projects)+b'\n',mode=0o600)
     return {'status':'ENABLED','repo':key,'transaction_id':tx.id,'profile':profile,'hooks':'PENDING_TRUST' if profile=='L2' else 'NOT_REGISTERED','session':'NEW_SESSION_REQUIRED'}
 
-def disable(repo):
+def disable(value):
+    repo=registered_project(value)
     projects=registry();record=projects.get(str(repo))
     if not record:return {'status':'ALREADY_DISABLED','repo':str(repo)}
     verify_owned(record)
@@ -392,7 +410,7 @@ def package(destination):
         relative=p.relative_to(ROOT)
         if any(private_path(Path(*relative.parts[:i])) for i in range(1,len(relative.parts)+1)):continue
         if relative.parts[0] in {'state','data','.codex','.pytest_cache'}:continue
-        if relative.parts[0]=='reports' and str(relative) not in {'reports/acceptance-summary.json','reports/known-limitations.md','reports/package-clean-install-3.1.0.json','reports/final-mcp-runtime-smoke-3.1.0.json','reports/native-hook-lifecycle-3.1.0.json'}:continue
+        if relative.parts[0]=='reports' and str(relative) not in {'reports/acceptance-summary.json','reports/known-limitations.md','reports/package-clean-install-3.1.1.json','reports/final-mcp-runtime-smoke-3.1.0.json','reports/native-hook-lifecycle-3.1.0.json'}:continue
         if relative.parts[0]=='.agents' and str(relative)!='.agents/plugins/marketplace.json':continue
         if relative.parts[0]=='vendor':
             if len(relative.parts)<3:continue
@@ -453,8 +471,8 @@ def main():
     subs.add_parser('install',help='Register prepared locked control plane; idempotent')
     for command in ['init','enable','refresh','disable','start','status','doctor']:
         p=subs.add_parser(command,help='Initialize Git if needed and enable the current project' if command=='init' else None)
-        optional=command in {'init','enable','refresh','start','status','doctor'}
-        p.add_argument('repo',nargs='?' if optional else None,default='.' if command in {'init','enable','refresh','start'} else None)
+        optional=command in {'init','enable','refresh','disable','start','status','doctor'}
+        p.add_argument('repo',nargs='?' if optional else None,default='.' if command in {'init','enable','refresh','disable','start'} else None)
         if command in {'init','enable','refresh'}:p.add_argument('--profile',choices=['L0','L1','L2'],default=None if command=='refresh' else defaults()['profile'])
         if command=='doctor':p.add_argument('--deep',action='store_true')
         if command=='start':p.add_argument('codex_args',nargs=argparse.REMAINDER)
@@ -484,7 +502,9 @@ def main():
         command=args.command
         repo=None
         if getattr(args,'repo',None) and command not in {'init','start'}:
-            repo=select_project(args.repo) if command in {'enable','refresh','context'} else repo_root(args.repo)
+            if command=='disable':repo=args.repo
+            elif command in {'enable','refresh','context','status','doctor'}:repo=select_project(args.repo)
+            else:repo=repo_root(args.repo)
         if command=='start':
             repo,doc=start_project(args.repo)
             codex_args=args.codex_args[1:] if args.codex_args[:1]==['--'] else args.codex_args

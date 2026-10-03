@@ -21,7 +21,7 @@ class AppServer:
         self.seq = 0
         self.notifications = []
         threading.Thread(target=self._read, daemon=True).start()
-        self.call('initialize', {'clientInfo': {'name': 'harness-acceptance', 'version': '3.1.0'},
+        self.call('initialize', {'clientInfo': {'name': 'harness-acceptance', 'version': '3.1.1'},
                                  'capabilities': {'experimentalApi': True}})
         self.send({'method': 'initialized'})
 

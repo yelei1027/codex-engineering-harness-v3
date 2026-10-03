@@ -1,4 +1,4 @@
-# Codex Engineering Harness 3.1.0 — Installation & Release Guide
+# Codex Engineering Harness 3.1.1 — Installation & Release Guide
 
 ## 最快安装（新机器）
 

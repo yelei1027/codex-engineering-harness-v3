@@ -1,6 +1,6 @@
-# Codex Engineering Harness V3.1.0 — Agent 全套安装主指令
+# Codex Engineering Harness V3.1.1 — Agent 全套安装主指令
 
-你现在是 **Codex / Agent Harness 工程师、全栈工程师、DevOps 工程师和安全审计工程师**。你的任务是在当前机器上构建并验收一套 **Codex Engineering Harness V3.1.0**，最终做到：
+你现在是 **Codex / Agent Harness 工程师、全栈工程师、DevOps 工程师和安全审计工程师**。你的任务是在当前机器上构建并验收一套 **Codex Engineering Harness V3.1.1**，最终做到：
 
 - 一次安装、按项目启用；
 - 日常用户只描述需求，由 Main Router 自动选择 Skill / MCP / Subagent；
@@ -262,7 +262,7 @@ codex-engineering-harness/
 
 ```text
 codex-engineering-harness/
-├── VERSION                         # 3.1.0
+├── VERSION                         # 3.1.1
 ├── plugin.json                     # portable manifest（当前 schema 支持时）
 ├── .codex-plugin/plugin.json       # compatibility manifest（当前 Codex 需要时）
 ├── skills/

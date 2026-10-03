@@ -1,6 +1,6 @@
 {
   "name": "codex-engineering-harness",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Project-scoped Codex engineering workflows",
   "skills": "./skills/",
   "interface": {

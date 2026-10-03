@@ -96,6 +96,23 @@ class HarnessCase(unittest.TestCase):
             cli.disable(self.repo)
         self.assertEqual(p.read_text(),'Additional user rules\n')
 
+
+    def test_disable_accepts_any_path_inside_enabled_project(self):
+        release=self.fake_release();nested=self.repo/'src/deep';nested.mkdir(parents=True)
+        with patch.object(cli,'ROOT',release):
+            cli.enable(self.repo,'L1')
+            result=cli.disable(nested)
+        self.assertEqual(result['status'],'DISABLED')
+        self.assertFalse((self.repo/'.codex/config.toml').exists())
+
+    def test_disable_non_project_parent_lists_enabled_projects(self):
+        release=self.fake_release()
+        with patch.object(cli,'ROOT',release):
+            cli.enable(self.repo,'L1')
+            with self.assertRaisesRegex(HarnessError,'Enabled projects') as error:
+                cli.disable(self.base)
+        self.assertIn(str(self.repo),str(error.exception))
+
     def test_unknown_overlay_preflight_no_mutation(self):
         release=self.fake_release();(self.repo/'harness.yaml').write_text('user-owned')
         with patch.object(cli,'ROOT',release),self.assertRaises(HarnessError):cli.enable(self.repo,'L1')

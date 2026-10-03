@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "version": "3.1.1",
+  "validated_archive_sha256": "5a89437e3ab637d0f15524e2a04713c4b84d95a85697e5a479eb09542a3b8084",
+  "source_release_hash": "74eb7776c9cdd839ee9796884ff01ae922c4882cf281ad15a68976f693b9e3e5",
+  "environment": {
+    "source": "fresh archive extraction",
+    "home": "/tmp/harness-v311-home",
+    "project": "/tmp/harness-v311-project",
+    "profile": "L1"
+  },
+  "checks": {
+    "archive_checksum": "PASS",
+    "bootstrap_locked_dependencies": "PASS",
+    "install": "PASS",
+    "project_init": "PASS",
+    "disable_from_nested_subdirectory_without_repo_argument": "PASS",
+    "registry_empty_after_disable": "PASS",
+    "uninstall": "PASS"
+  },
+  "note": "The final repack changes only release evidence metadata; control-plane release_hash remains identical and is rechecked after repack."
+}

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="yelei1027/codex-engineering-harness-v3"
-TAG="${1:-v3.1.0}"
+TAG="${1:-v3.1.1}"
 VERSION="${TAG#v}"
 ASSET="codex-engineering-harness-${VERSION}-linux-x86_64.tar.gz"
 TARGET="${HARNESS_INSTALL_DIR:-$HOME/.local/share/codex-engineering-harness/releases/$VERSION}"
