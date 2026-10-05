@@ -8,7 +8,11 @@ import uuid
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = 'http://127.0.0.1:18080'
+sys.path.insert(0, str(ROOT))
+from harness_core.service_reports import prepare_outputs
+REPORTS, fixture_path = prepare_outputs(ROOT)
+
+BASE = json.loads((ROOT/'services-binding.json').read_text())['service_urls']['powercontext']
 def request(path, payload=None, base=BASE):
     data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode()
     req = Request(base + path, data=data, headers={'Content-Type': 'application/json'})
@@ -33,10 +37,9 @@ prepared = request('/v1/work/handoffs/prepare-current', {
         'omissions': ['No generation or embedding provider configured.']}})
 committed = request('/v1/handoff/commit', {'scope_id': sid, 'handoff': prepared['handoff']})
 fixture = {'scope_id': sid, 'revision': committed['reference'], 'marker': marker, 'url': BASE}
-fixture_path = ROOT/'runtimes/powercontext/recall-fixture.json'
 fixture_path.write_text(json.dumps(fixture, ensure_ascii=False, indent=2) + '\n')
 receiver = subprocess.run([sys.executable, str(ROOT/'scripts/services-recall.py'), str(fixture_path)], text=True, capture_output=True, check=True)
 recall = json.loads(receiver.stdout)
 result = {'status': 'PASS', 'scope_id': sid, 'ready': ready, 'capabilities': capabilities, 'handoff': {'prepared': prepared, 'committed': committed, 'independent_recall': recall}, 'full_automatic_memory': 'NOT_TESTED_PROVIDER_UNCONFIGURED'}
-(ROOT/'reports/powercontext-smoke.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
+(REPORTS/'powercontext-smoke.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
 print(json.dumps({'status': 'PASS', 'scope_id': sid, 'revision': committed['reference'], 'independent_receiver': recall['status']}))

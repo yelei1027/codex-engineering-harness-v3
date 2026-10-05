@@ -1,102 +1,167 @@
-# Codex Engineering Harness 3.1.1 — Installation & Release Guide
+# Harness 安装、接入与维护
 
-## 最快安装（新机器）
+本文针对 PRD #1 的当前源码。正式 Release 仍为 v3.1.1；新入口和恢复流程只有在所用版本确实支持并通过对应验收后才可使用。不要把源码专项通过当作旧正式包已经具备新行为。
 
-先完成 `gh auth login`，然后执行：
+## 一次准备本体
 
-```bash
-gh api repos/yelei1027/codex-engineering-harness-v3/contents/scripts/install-release.sh --jq .content | base64 -d | bash
-```
+源码完整准备前可运行 `python3 bin/harness preflight`；已有共享入口时用 `harness preflight`。它只读检查 Linux x86_64、明确选择的 Codex 运行时、基础工具、systemd 用户会话和 Docker，缺失时给出下一步。完整准备自动执行同一检查，条件不足时不开始登记、下载或组件准备。兼容下限来自清单，当前为 Codex 0.160.0；额外 Provider Key 用到时再配置，登录和实际调用另行核验。
 
-安装完成后，每个项目只需要：
+检查被当前权限拒绝时显示 `UNVERIFIED`（未核验），并列入 `unverified`；它不代表组件未安装或服务未运行。先在已授权且可访问该组件的环境中重跑 `harness preflight`，不要据此安装或重启服务，也不要为预检开放业务项目 Full access。未核验项仍会阻止完整准备，不能当作通过。
 
-```bash
-cd "/你的项目路径"
-harness start .
-```
+当前支持目标是个人 Linux x86_64 Codex Desktop。先核对 Git、Node/npm、Python 3、uv、Docker Compose、用户级 systemd 和 Codex Desktop。私有仓库访问先使用 `gh auth login`，不会把 Codex 登录凭据导出给第三方 Provider。
 
-详细说明见仓库首页 README。已有 Harness 不要重复运行安装脚本；版本更新走 `harness update` 候选验收流程。
-
-## 1. Install the prepared control plane
+正式包的获取方式见 [README](README.md)。使用已经确认的新版源码或解包目录时，可以从任意位置运行：
 
 ```bash
-cd /path/to/codex-engineering-harness
-python3 scripts/bootstrap.py
-# Optional local sidecars:
-python3 scripts/bootstrap.py --services
-./bin/harness install
-./bin/harness doctor --deep
+python3 "/你的Harness目录/bin/harness" install --prepare
 ```
 
-`bootstrap.py` prepares locked dependencies. `harness install` registers the accepted source; it does not make untrusted project Hooks trusted.
+此入口先恢复适用的保留数据，再准备当前锁定的完整组件和登记共享启动器。后续使用 `harness`，无需进入安装目录。PATH 缺少 `~/.local/bin` 时，按安装输出补入 PATH。准备不等于所有工具实际调用已经通过；额外 Provider Key 在真正需要时配置。
 
-## 2. Enable or initialize a project
+安装失败保留已创建的受管源文件、依赖进度和日志。当前源码的 `install --prepare` 会指出未完成的组件与阶段，并给出具体下一步，例如核对 Node/npm、uv、Docker 或下载源后重试。详细诊断日志保留在安装目录的 `private/install-logs/`，不会把依赖原始输出直接显示为用户错误。若镜像已构建但服务只启动了一部分，重试会核对源码、依赖、镜像、容器端口和数据卷挂载，复用一致的构建并继续启动，保留数据和原日志；停止状态的受管容器也支持接续。构建记录缺失、内容变化或存在其他消费者时会停止并提示使用隔离候选，不自动删除容器来绕过冲突。用同一版本、同一目录重试；未知非空目录、源文件后来被修改或所有权冲突会停止操作。
 
-Recommended default for a new project:
+## 第一次接入项目
+
+先只读查看影响：
 
 ```bash
-cd /absolute/path/to/project
-harness init
-harness start
+harness prepare "/你的项目路径"
 ```
 
-`init` and first `start` may initialize a local Git repository and enable Harness with the default L2 installation profile. They do not create a commit or remote. Existing Git roots are resolved from subdirectories. HOME, filesystem root, bare/abnormal repositories, and collection directories containing nested repositories are refused.
-
-With the Codex Desktop bundled runtime, `harness start` returns `DESKTOP_PROJECT_READY` and the exact repository path instead of trying to launch a TUI. Open that repo as the **primary folder** in Codex Desktop and start a new chat. A verified complete standalone Codex CLI can use `HARNESS_CODEX_BINARY` with `HARNESS_CODEX_LAUNCH_MODE=cli`.
-
-To avoid project lifecycle Hooks:
+核对是否初始化本地 Git、添加哪些配置/技能、接入配置与 Hook、权限默认和会话加载要求。已有适用授权就继续；否则确认这份准备范围一次，再执行：
 
 ```bash
-harness init --profile L1
+harness prepare "/你的项目路径" --apply
 ```
 
-For an already enabled project after a Harness source update:
+不会创建提交或远端仓库。默认接入配置 L2 准备生命周期 Hook；需要无 Hook 的接入方式时选择 `--profile L1`。**接入配置与本次任务风险不同**，一个低风险任务不因项目接入 L2 而机械运行完整工程链。
 
-```bash
-harness refresh /absolute/path/to/project
-```
+在 Codex Desktop 以该项目作为主文件夹打开新会话。按原生机制审阅项目配置与 Hook 信任；写入配置、重读文件或重启不等于 Hook 已信任。`harness start /项目路径` 会给出项目状态和后续说明，未接入时先预览，不默认初始化。
 
-Refresh preserves the selected profile, unmanaged AGENTS/config additions, and task data.
+若 Hook 提示“没有注入规划”，先运行 `harness check` 检查安装文件。Hook 入口、规划脚本或锁定清单缺失、被改都会阻止 L2 接入；先准备完整版本，再核对原生信任和实际规划注入。运行成功、文件完整和已获信任分别验证。
 
-## 3. Trust L2 Hooks
-
-Open a **new Codex session from the enabled project**, then use:
+然后明确选择：
 
 ```text
-/hooks
+用 Harness，先只读检查这个项目并引导我确认优化范围。
 ```
 
-Review source, matcher, resolved command and requested behavior. Trust only the expected project-owned definitions. Direct execution of Hook scripts is not equivalent to native lifecycle delivery.
+本聊天沿用该选择；普通聊天与未请求 Harness 的开发不激活它。日常不要求反复输入 `$` 或 `@`。
 
-The L2 project currently combines locked planning-with-files handlers with Harness context handlers for `PreCompact`, `PostCompact`, and `SessionStart`. Same-event handlers must not rely on ordering.
+## 确认范围与原生权限
 
-## 4. Context recovery
+模糊需求先核对本轮实际只读边界，再做体检、给有证据的少量建议、询问真正影响目标/验收/风险的选择。明确且已授权的工作跳过重复访谈。范围内正常实现、失败修复和重新验证自主推进。
+
+项目准备提供命名配置 `harness-inspect`，继承原生 `:read-only`。项目已原生信任并正确加载后，在消息框下方的权限菜单明确选择它，再核对下一轮实际权限；桌面保存的选择可能覆盖配置默认，设置页的“只读”不等于聊天已切换。若菜单缺少该项，记录缺失，不把“请求批准”当作只读。
+
+范围批准后可通过原生“请求批准”模式开放工作区写权限，核验后执行；完成或取消后恢复 `harness-inspect`。该切换仍需原生操作，安装不自动替你选择。MCP/App 副作用另需原生审核，既有同名服务器和每工具覆盖须单独核验。
+
+人类消息或原生批准事件才是批准来源。`--apply`、节点、计划或模型生成的“approved”文件只记录数据。完成或取消后按实际原生机制恢复只读，在后续轮次核验；不能用任务状态声称 OS 权限已收回。详细边界见 [权限说明](skills/harness-dev/references/permissions.md)。
+
+项目恢复 Hook 使用准备时绑定的安装状态目录，不要求桌面继承终端环境，也不会借用另一安装的任务记录。更新或迁移改变恢复命令时，按原生提示重新核对并信任当前定义；旧 Checkpoint 与当前源码不一致时先报告冲突。
+
+## 状态与服务
 
 ```bash
-harness context status . --used-percent 80
-harness context checkpoint . --task TASK --facts .harness/task/TASK/context-facts.json --resume-node T00
-harness context verify . --task TASK
-harness context handoff . --task TASK
-harness context recall . --task TASK
+harness status
+harness doctor "/项目路径" --deep
+harness services status
+harness processes status
 ```
 
-70/80/90% are policy thresholds applied only to a real usage number supplied by the host/user. Ordinary `/compact` creates a local checkpoint, not a formal remote Handoff. Cross-session Handoff uses the project-bound PowerContext Basic Scope and exact revision. Full automatic memory remains optional and requires separate supported model providers.
+结构、注册、版本命令、真实调用、待信任、待配置和未验证分别记录。版本命令成功不是 MCP 握手/业务调用证明，容器 running 不是 Provider 生成证明。
 
-## 5. Visual input
+`harness services start|stop` 管理此安装的受管服务；`harness processes stop` 只停止精确登记的组件进程。停止保留数据卷。未知进程或容器引用本安装资源时，维护报告冲突，不猜 PID 或停止无关实例。
 
-For screenshot/UI work, prefer the current Codex image-understanding route when available. The local screenshot-to-code frontend/backend remains an optional sidecar. Its health does not prove third-party model generation; model-provider credentials must be configured and separately tested.
+## 更新与项目迁移
 
-## 6. Release verification
-
-Before packaging:
+先给明确版本、来源、受影响项目、资源和恢复边界摘要。已有相同维护范围授权不重复确认。
 
 ```bash
-python3 -m pytest tests/test_harness_core.py -q
-./bin/harness doctor --deep
+harness update --to "/明确的新版本来源目录"
+```
+
+新源码被复制到隔离候选，仅沿用宿主 Codex 选择；依赖与服务绑定须在候选中重新准备，不借用来源或其他安装目录的运行时。当前接受版本保持可用。验收计划必须包含 Hook 类别，绑定里缺少或关闭 `hooks` 字段也不能跳过；历史收据在接受时重新核对。
+
+接受前核对候选已准备的软件、专属命令和脚本、必要服务及端口/容器/卷归属，并确认没有组件进程占用。实际公开端口和挂载必须与受管配方一致，额外端口或宿主目录挂载会阻止接受。安装主进程退出不代表包管理子进程已停止；未结束的准备日志、仍在运行的写入组或尚未恢复的数据暂存也会阻止验收和接受。最终核对与接受操作持有该候选的准备和服务锁。缺少准备、后来修改或归属冲突时保留当前版本与候选，先处理再重试。退出码和类别记录仍须对应真实场景，不能用夹具或 AI 自报替代原生 Hook 验收。详见 `harness update --help`。
+
+项目注册的受管 stdio MCP 通过 Codex 原生 `env_vars` 白名单继承当前桌面的 `XDG_RUNTIME_DIR` 和 `DBUS_SESSION_BUS_ADDRESS`，供用户级 systemd 管理组件进程。原有变量白名单和显式环境配置保留，不固化机器路径或复制整个宿主环境。项目准备成功仍不代表原生 MCP 已实际启动；诊断时需核对原生工具清单和真实调用。[配置字段说明](https://learn.chatgpt.com/docs/config-file/config-reference)。
+
+多个 stdio 组件可同时初始化：启动登记阶段共享准备与服务读取锁，安装、更新、构建和卸载继续使用独占锁。启动后的受管进程清单继续参与维护保护，不能因为启动锁已经释放就覆盖正在使用的运行时。
+
+准备中断后仍在相同受管目录重试。Python 环境重建会先核对所有权、暂存需保留的数据，再以 `uv venv --allow-existing` 保留现有文件继续准备；未知目录或后续用户修改仍会阻止操作，不能直接清空环境来绕过冲突。
+
+新版本接受后，旧项目仍绑定旧根，活动或暂停任务不会自动换依赖。任务结束后，预览迁移：
+
+```bash
+harness migrate "/项目路径" --from "/旧安装根"
+# 核对具体范围，按适用授权执行：
+harness migrate "/项目路径" --from "/旧安装根" --apply
+```
+
+同安装根的 Overlay 更新才使用 `harness refresh`。迁移保留业务文件、任务记录和旧根；Hook 定义变化按原生要求重新审阅。未知所有权或后来的修改会阻止覆盖。
+
+## 完整卸载与重装
+
+```bash
+harness uninstall
+# 确认输出中的完整资源范围后：
+harness uninstall --apply
+```
+
+联合核对已接受、保留、候选及准备中安装根；活动或暂停/阻塞任务、未知依赖、未登记消费者、文件修改或清单缺失时，在清理前停止。完成评审、取消及恢复完成的终态不会被当作活动任务。默认停止受管组件和服务、解除项目接入、清理精确受管程序和依赖。用户源码 checkout 保留，项目代码和任务记录保留，服务数据卷保留。
+
+输出列出每个根的数据目录。运行时 `.env`、数据库和私有数据保留；已登记源码对应的 Python 缓存只作备份，重装不恢复执行。反复卸载使用独立数据目录，不覆盖旧备份。
+
+官方运行验证报告写入私有数据区，随卸载保留并在重装恢复，避免验证产物阻挡同路径重新安装。发行包中的验收摘要仍独立说明该版本的实际验证范围。
+
+重装后查看数据恢复计划：
+
+```bash
+harness recover-data
+harness recover-data --apply
+```
+
+新版完整安装入口已在依赖准备前调用适用恢复；手动入口用于查看和接续。恢复持久记录整组路径和预期内容，中断后重试先检查已移与未移数据，冲突保留两边，不覆盖后来内容。
+
+`recover-data` 恢复当前安装根对应的本地数据。软件跨根迁移保留项目原来的记忆服务地址、Scope 和精确 Revision，核验原服务的受管归属；原服务不可用时报告未同步并保留本地记录。
+
+本轮源码新增 `recover-memory`，使用当前已准备的锁定 PowerContext 镜像启动其它已卸载根的保留数据卷。完整 `install --prepare` 自动接续这项恢复；也可先查看具体范围再执行：
+
+```bash
+harness recover-memory
+harness recover-memory --apply
+```
+
+恢复保留原地址和项目绑定，不合并数据库、不创建替代 Scope。原端口被占用、数据卷缺失或有未知消费者、恢复代次变化、镜像与原服务不一致时保留冲突，不能自动升级数据库。服务启动与精确 Scope/Revision 回读分别验证；只启动容器不表示所有记忆已验证。`services` 和完整卸载同时管理这些恢复服务，输出保留的环境文件和数据卷位置。这些改动仍需最终整体验收，尚未发布到正式安装包。
+
+卸载中断则使用原操作 ID：
+
+```bash
+harness uninstall-recover 操作ID
+harness uninstall-recover 操作ID --apply
+```
+
+受管启动器能分派到原操作的恢复程序，即使安装入口已经移走。先检查所有安装根与配置，任一冲突就全部保留；文件恢复不代表服务重启或数据库回滚。不要手工删除清单、恢复日志或整个 `~/.codex`。
+
+## 压缩与正式交接
+
+长任务使用已有任务与选定 `plan-id`，保存 Checkpoint 后压缩，恢复时核对代码、任务实例、范围与证据。同名任务重建不继承旧摘要；分支和忽略目录中的证据变化也检查。
+
+```bash
+harness context checkpoint /项目 --task TASK --facts /项目/.harness/task/TASK/context-facts.json --plan-id PLAN
+harness context verify /项目 --task TASK
+```
+
+普通压缩只做本地 Checkpoint。确实需要跨会话时才使用 PowerContext Basic 的正式 Handoff 与指定 Scope/Revision；Full 自动记忆另需 Provider 与真实验证。
+
+## 发布前核验
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 scripts/check-skill-manifests.py
+python3 scripts/build-manuals.py
 git diff --check
-git status --short
 ```
 
-Required release blockers: current source tests, review/secret audit, documentation/version consistency, package clean-install validation, and L2 native Hook lifecycle verification if L2 is claimed as fully verified. Optional provider blocks must remain explicit.
-
-Package only through `./bin/harness package`, then extract the archive into a clean directory and verify install → enable/init → start/doctor → disable/uninstall → reinstall. Do not publish machine bindings, secrets, databases, task state, caches, or business data.
+还须核验当前不可变源码对应的干净包安装、真实组件与服务生命周期、实际桌面需求引导/权限/Hook、适用独立审查及交付版本。打包使用 `bin/harness package`，排除机器绑定、凭据、会话、规划和业务数据；历史报告与 AI 自报不能代替当前验收。默认本地交付，GitHub 更新、合并或部署各按适用明确授权执行。

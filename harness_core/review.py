@@ -5,6 +5,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from .common import HarnessError, atomic, canonical, empty_tree, git, git_head, new_id, now, private_path, read_json, safe_id, sha, write_json
+from .transaction import safe_parent
 
 
 def names(data):
@@ -109,8 +110,11 @@ def freeze(repo, task, base, spec=None, checks=None, allowlist=None):
         write_json(temporary/'untracked-manifest.json',{'files':[e for e in entries if e['path'] in untracked],'excluded':excluded})
         for name,provided in [('spec-ref.json',spec),('checks.json',checks)]:
             if provided:
-                path=Path(provided).resolve()
-                if private_path(path):raise HarnessError('Private file cannot be used as spec/check evidence')
+                evidence_path=Path(provided).absolute();safe_parent(evidence_path)
+                if evidence_path.is_symlink():raise HarnessError('Symlink cannot be used as spec/check evidence')
+                path=evidence_path.resolve()
+                classified=path.relative_to(repo) if repo in path.parents else path
+                if private_path(classified):raise HarnessError('Private file cannot be used as spec/check evidence')
                 data=path.read_bytes();atomic(temporary/('spec-source' if name.startswith('spec') else 'checks-source.json'),data,0o400)
                 write_json(temporary/name,{'source':str(path),'sha256':sha(data),'status':'PROVIDED_NOT_INDEPENDENTLY_VERIFIED'})
             else:write_json(temporary/name,{'status':'UNVERIFIED','reason':'No evidence supplied'})

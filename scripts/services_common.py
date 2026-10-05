@@ -48,56 +48,10 @@ def verify_source(name):
             'verification': 'ACCEPTED_MANIFEST_FILE_HASHES'}
 
 def prepare_runtime(name):
-    recipes = ROOT / 'templates/services' / name
-    runtime = ROOT / 'runtimes' / name
-    runtime.mkdir(parents=True, exist_ok=True)
-    for recipe in recipes.iterdir():
-        if recipe.is_file() and recipe.name != 'env.example':
-            shutil.copy2(recipe, runtime / recipe.name)
-    environment = runtime / '.env'
-    if not environment.exists():
-        descriptor = os.open(environment, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, 'w') as handle:
-            handle.write((recipes / 'env.example').read_text())
-    return runtime
+    from harness_core.sidecars import prepare_runtime as prepare
+    return prepare(ROOT,name)
+
 
 def write_service_binding():
-    """Generate this machine's binding from its resolved Compose publish ports."""
-    binding = {'private_machine_binding': True, 'mcp_servers': {},
-               'component_commands': {}, 'service_urls': {}}
-    for name in PINS:
-        compose = ROOT/'runtimes'/name/'compose.yaml'
-        if not compose.is_file():
-            continue
-        # Resolve Compose substitutions without logging env values or credentials.
-        resolved = json.loads(subprocess.check_output([
-            'docker', 'compose', '-p', 'codex-harness', '-f', str(compose),
-            'config', '--format', 'json'], text=True))
-        urls = {}
-        for component, configuration in resolved['services'].items():
-            for port in configuration.get('ports', []):
-                if port.get('host_ip') not in ['127.0.0.1', '::1']:
-                    raise RuntimeError(f'{component}: refusing a non-loopback machine binding')
-                host = '[::1]' if port['host_ip'] == '::1' else '127.0.0.1'
-                urls[component] = f'http://{host}:{port["published"]}'
-        if name == 'powercontext':
-            url = urls['powercontext']
-            binding['service_urls']['powercontext'] = url
-            binding['mcp_servers']['powercontext'] = {'url': url+'/mcp/'}
-            binding['component_commands']['powercontext'] = [
-                str(ROOT/'runtimes/powercontext/client-venv/bin/powercontext'),
-                'doctor', '--server-url', url, '--json']
-        else:
-            binding['service_urls'].update({'screenshot_backend': urls['screenshot-backend'],
-                                           'screenshot_frontend': urls['screenshot-frontend']})
-            binding['component_commands']['screenshot-to-code'] = [
-                sys.executable, str(ROOT/'scripts/services.py'), 'status', '--service', name]
-    path = ROOT/'services-binding.json'
-    # Atomic private replacement; preserve no previous machine paths.
-    temporary = path.with_suffix('.json.tmp')
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, 'w') as handle:
-        handle.write(json.dumps(binding, ensure_ascii=False, indent=2)+'\n')
-    temporary.chmod(0o600)
-    temporary.replace(path)
-    return binding
+    from harness_core.sidecars import write_binding
+    return write_binding(ROOT)

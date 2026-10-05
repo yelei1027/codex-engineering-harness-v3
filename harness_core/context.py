@@ -68,6 +68,15 @@ def refs(repo,values):
     return result
 
 
+def reference_conflicts(repo,doc):
+    conflicts=[]
+    for name in ['spec_refs','test_evidence','pwf']:
+        recorded=[r for r in doc[name] if 'path' in r]
+        if refs(repo,[r['path'] for r in recorded])!=recorded:
+            conflicts.append(name.upper()+'_CHANGED')
+    return conflicts
+
+
 def choose_task(repo,task=None,session=None):
     if task:return safe_id(task)
     if session:
@@ -86,38 +95,60 @@ def choose_task(repo,task=None,session=None):
     return active[0]
 
 
-def checkpoint(repo,task,facts=None,resume_node=None,session=None,reason='manual'):
+def task_instance(path):
+    # The first event is immutable for this task lifetime; legacy tasks also
+    # have a concrete creation event. Revision alone can repeat after rebuild.
+    return sha(safe_file(path/'events.jsonl').read_bytes().splitlines()[0])
+
+
+def checkpoint(repo,task,facts=None,resume_node=None,session=None,reason='manual',plan_id=None):
     task=safe_id(task);path=workflow.task_path(repo,task)
     with lock(repo/'.harness/state/workflow.lock'):
         safe_file(path/'events.jsonl');state=workflow.load(path)
         old_path=safe_file(path/'context-checkpoint.json');old=read_json(old_path,{})
         old_manifest=read_json(safe_file(path/'context-checkpoint.sha256.json'),{})
         old_integrity=bool(old) and old_manifest.get('sha256')==sha(canonical(old))
+        instance=task_instance(path)
+        old_identity=(old_integrity and old.get('repo')==str(repo) and old.get('task_id')==task
+                      and old.get('task_instance')==instance)
+        previous_plan=old.get('plan_id') if old_identity else None
+        selected_plan=safe_id(plan_id) if plan_id is not None else safe_id(previous_plan) if previous_plan is not None else None
+        # The shared active-plan pointer and host environment are not task bindings.
+        pwf=refs(repo,[f'.planning/{selected_plan or task}/{name}.md' for name in ['task_plan','findings','progress']])
         # Reuse semantic facts only from an integrity-verified checkpoint that still
         # describes this exact source and workflow revision. Tampered/stale data
         # degrades to CHECKPOINT_PARTIAL instead of being re-signed as current.
         fingerprint,source=review.fingerprint(repo,state['baseline_head'])
-        if facts is None and old_integrity and old.get('fingerprint')==fingerprint and old.get('workflow_revision')==state['revision']:
+        branch=run(['git','-C',repo,'symbolic-ref','--short','-q','HEAD'],ok=False).stdout.decode().strip() or 'DETACHED'
+        reused_facts=False
+        if (facts is None and old_identity and selected_plan==previous_plan
+                and old.get('fingerprint')==fingerprint and old.get('workflow_revision')==state['revision']
+                and old.get('git',{}).get('branch')==branch and not reference_conflicts(repo,old)):
             facts=old.get('facts')
+            reused_facts=facts is not None
         if facts is not None:validate_facts(facts)
+        if selected_plan is not None and (plan_id is not None or facts is not None) and any(r['status']!='PRESENT' for r in pwf):
+            raise HarnessError('Selected plan requires task_plan.md, findings.md and progress.md under .planning/'+selected_plan)
         node=resume_node or state.get('resume_node') or state['node']
         if node not in workflow.contract()['dynamic_resume']['allowed_nodes']:
             raise HarnessError('Checkpoint needs an allowed resume node')
-        branch=run(['git','-C',repo,'symbolic-ref','--short','-q','HEAD'],ok=False).stdout.decode().strip() or 'DETACHED'
         head=git_head(repo)
         def paths(*args):return sorted(p for p in review.names(git(repo,*args)) if not private_path(p))
         specs=refs(repo,facts['spec_refs']) if facts else []
         evidence=refs(repo,[t['evidence'] for t in facts['tests'] if t.get('evidence')]) if facts else []
-        pwf=refs(repo,[f'.planning/{task}/{name}.md' for name in ['task_plan','findings','progress']])
         value={'schema_version':1,'checkpoint_id':new_id('context'),'task_id':task,'repo':str(repo),'created':now(),'reason':reason,
-               'node':state['node'],'resume_node':node,'workflow_revision':state['revision'],'fingerprint':fingerprint,
+               'node':state['node'],'resume_node':node,'workflow_revision':state['revision'],'task_instance':instance,'fingerprint':fingerprint,
                'git':{'branch':branch,'head':head,'head_kind':'COMMIT' if run(['git','-C',repo,'rev-parse','--verify','HEAD'],ok=False).returncode==0 else 'UNBORN_EMPTY_TREE',
                       'staged':paths('diff','--cached','--name-only','-z',head),'unstaged':paths('diff','--name-only','-z'),
                       'untracked':paths('ls-files','--others','--exclude-standard','-z')},
                'facts':facts,'facts_status':'AGENT_RECORDED_NOT_INDEPENDENTLY_VERIFIED' if facts else 'AGENT_SUMMARY_REQUIRED',
-               'spec_refs':specs,'test_evidence':evidence,'pwf':pwf,'remote_sync':'NOT_REQUESTED_FOR_COMPACT'}
+               'spec_refs':specs,'test_evidence':evidence,'plan_id':selected_plan,'pwf':pwf,'remote_sync':'NOT_REQUESTED_FOR_COMPACT'}
         # A race must never produce a checkpoint claiming a different source version.
         if review.fingerprint(repo,state['baseline_head'])[0]!=fingerprint:raise HarnessError('Source changed while checkpointing; retry')
+        if reference_conflicts(repo,value):raise HarnessError('Reference changed while checkpointing; retry')
+        if reused_facts and reference_conflicts(repo,old):raise HarnessError('Previous evidence changed while checkpointing; retry')
+        current_branch=run(['git','-C',repo,'symbolic-ref','--short','-q','HEAD'],ok=False).stdout.decode().strip() or 'DETACHED'
+        if current_branch!=branch:raise HarnessError('Branch changed while checkpointing; retry')
         output=safe_file(path/'context-checkpoint.json');write_json(output,value)
         write_json(safe_file(path/'context-checkpoint.sha256.json'),{'sha256':sha(canonical(value))})
         if session:
@@ -137,14 +168,13 @@ def load_checkpoint(repo,task):
 def verify(repo,task):
     doc=load_checkpoint(repo,task);state=workflow.load(workflow.task_path(repo,task))
     conflicts=[]
+    if doc.get('task_instance')!=task_instance(workflow.task_path(repo,task)):conflicts.append('TASK_INSTANCE_CHANGED_OR_UNKNOWN')
     current=review.fingerprint(repo,state['baseline_head'])[0]
     if current!=doc['fingerprint']:conflicts.append('GIT_OR_WORKTREE_CHANGED')
     branch=run(['git','-C',repo,'symbolic-ref','--short','-q','HEAD'],ok=False).stdout.decode().strip() or 'DETACHED'
     if branch!=doc['git']['branch']:conflicts.append('BRANCH_CHANGED')
     if state['revision']!=doc['workflow_revision']:conflicts.append('WORKFLOW_CHANGED')
-    for name in ['spec_refs','test_evidence','pwf']:
-        paths=[r['path'] for r in doc[name] if 'path' in r]
-        if refs(repo,paths)!=[r for r in doc[name] if 'path' in r]:conflicts.append(name.upper()+'_CHANGED')
+    conflicts.extend(reference_conflicts(repo,doc))
     if not doc['facts']:conflicts.append('AGENT_SUMMARY_REQUIRED')
     else:validate_facts(doc['facts'])
     return {'status':'RESUME_CONFLICT' if conflicts else 'RESUME_OK','task_id':task,'resume_node':doc['resume_node'],

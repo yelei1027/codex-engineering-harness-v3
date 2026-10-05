@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from harness_core import cli,context,memory,review,workflow
-from harness_core.common import HarnessError, ROOT, read_json, sha, write_json
+from harness_core.common import HarnessError, PWF_CODEX_RUNTIME_FILES, ROOT, canonical, read_json, sha, write_json
 from harness_core.transaction import Transaction, image, rollback
 
 CONTRACT=ROOT/'contracts/workflow.json'
@@ -34,6 +34,7 @@ class HarnessCase(unittest.TestCase):
         (release/'VERSION').write_text('3.0.0\n')
         (release/'skills/harness-dev').mkdir(parents=True)
         (release/'skills/harness-dev/SKILL.md').write_text('---\nname: harness-dev\ndescription: test\n---\nRouter\n')
+        shutil.copytree(ROOT/'skills/harness-entry',release/'skills/harness-entry')
         (release/'templates/project').mkdir(parents=True)
         (release/'templates/project/AGENTS.harness.md').write_text('Read local router.\n')
         (release/'vendor/planning-with-files/hooks').mkdir(parents=True)
@@ -46,6 +47,15 @@ class HarnessCase(unittest.TestCase):
         shutil.copytree(ROOT/'harness_core',release/'harness_core',ignore=shutil.ignore_patterns('__pycache__'))
         (release/'bin').mkdir();shutil.copyfile(ROOT/'bin/harness',release/'bin/harness');(release/'bin/harness').chmod(0o755)
         (release/'tests').mkdir();(release/'tests/test_candidate.py').write_text('import unittest\nclass Smoke(unittest.TestCase):\n def test_isolated(self):\n  import os\n  self.assertIn("candidate-private",os.environ["HARNESS_STATE_DIR"])\n')
+        # This fixture uses the real native Hook definition, so provide its full
+        # pinned runtime rather than an incomplete release accepted by old checks.
+        assets={}
+        for name in sorted(set(PWF_CODEX_RUNTIME_FILES)|{'hooks/codex-hooks.json'}):
+            source=ROOT/'vendor/planning-with-files'/name
+            target=release/'vendor/planning-with-files'/name
+            target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
+            assets[name]={'kind':'file','sha256':sha(source.read_bytes())}
+        write_json(release/'manifests/source-trees.json',{'planning-with-files':{'files':assets}})
         return release
 
     def test_transaction_restores_bytes_and_mode(self):
@@ -223,7 +233,8 @@ class HarnessCase(unittest.TestCase):
         (release/'.env').write_text('secret')
         (release/'vendor/example/.git').mkdir(parents=True);(release/'vendor/example/.git/config').write_text('credential')
         (release/'vendor/example/LICENSE').write_text('license')
-        write_json(release/'manifests/source-trees.json',{'example':{'files':{'LICENSE':{'kind':'file','sha256':sha(b'license')}}}})
+        trees=read_json(release/'manifests/source-trees.json');trees['example']={'files':{'LICENSE':{'kind':'file','sha256':sha(b'license')}}}
+        write_json(release/'manifests/source-trees.json',trees)
         destination=self.base/'delivery.tar.gz'
         with patch.object(cli,'ROOT',release):cli.package(destination)
         import tarfile
@@ -331,6 +342,9 @@ class HarnessCase(unittest.TestCase):
     def test_l2_hook_registered_pending_trust(self):
         release=self.fake_release();hook=release/'vendor/planning-with-files/hooks/codex-hooks.json';hook.parent.mkdir(parents=True,exist_ok=True)
         write_json(hook,{'hooks':{'SessionStart':[{'hooks':[{'command':'${PLUGIN_ROOT}/scripts/start'}]}]}})
+        trees=read_json(release/'manifests/source-trees.json')
+        trees['planning-with-files']['files']['hooks/codex-hooks.json']['sha256']=sha(hook.read_bytes())
+        write_json(release/'manifests/source-trees.json',trees)
         with patch.object(cli,'ROOT',release):
             result=cli.enable(self.repo,'L2');self.assertEqual(result['hooks'],'PENDING_TRUST')
             self.assertEqual(cli.doctor(self.repo)['categories']['HOOKS']['status'],'PENDING_TRUST')
@@ -353,6 +367,16 @@ class HarnessCase(unittest.TestCase):
 
     def acceptance_plan(self,report,failure=None):
         from harness_core.acceptance import REQUIRED
+        from harness_core import software
+        candidate=Path(report['candidate'])
+        runtime=candidate/'runtimes/node/fixture-command';runtime.parent.mkdir(parents=True,exist_ok=True)
+        runtime.write_text('#!/bin/sh\nexit 0\n');runtime.chmod(0o755)
+        binding=read_json(candidate/'machine-binding.json')
+        binding.update(mcp_servers={'test':{'command':str(runtime),'args':[]}},
+                       component_commands={'test':[str(runtime),'--version']})
+        write_json(candidate/'machine-binding.json',binding)
+        software.capture(candidate,['runtimes/node'])
+        report['machine_binding_hash']=sha(canonical(binding))
         import sys
         plan={'release_hash':report['release_hash'],'machine_binding_hash':report['machine_binding_hash'],
               'checks':[{'category':c,'command':[sys.executable,'-c','import sys;sys.exit('+('1' if c==failure else '0')+')']} for c in sorted(REQUIRED)]}
@@ -418,7 +442,8 @@ class HarnessCase(unittest.TestCase):
         release=self.fake_release();vendor=release/'vendor/example';vendor.mkdir(parents=True)
         (vendor/'file').write_text('allowed');(vendor/'untracked-session').write_text('private')
         (vendor/'link').symlink_to('file')
-        write_json(release/'manifests/source-trees.json',{'example':{'files':{'file':{'kind':'file','sha256':sha(b'allowed')},'link':{'kind':'symlink','target':'file'}}}})
+        trees=read_json(release/'manifests/source-trees.json');trees['example']={'files':{'file':{'kind':'file','sha256':sha(b'allowed')},'link':{'kind':'symlink','target':'file'}}}
+        write_json(release/'manifests/source-trees.json',trees)
         for name in ['private','candidate-private','.test-projects']:
             p=release/name;p.mkdir();(p/'session.txt').write_text('PRIVATE_SENTINEL')
         destination=self.base/'package.tar.gz'
@@ -435,7 +460,7 @@ class HarnessCase(unittest.TestCase):
         with patch.object(cli,'ROOT',release):
             cli.install();report=cli.update(release);candidate=Path(report['candidate'])
             (candidate/'skills/harness-dev/agents/openai.yaml').write_text('allow_implicit_invocation: true')
-            binding=read_json(candidate/'machine-binding.json');binding['mcp_servers']['test']={'url':'http://localhost:9200/mcp'};write_json(candidate/'machine-binding.json',binding)
+            binding=read_json(candidate/'machine-binding.json');binding.setdefault('mcp_servers',{})['test']={'url':'http://localhost:9200/mcp'};write_json(candidate/'machine-binding.json',binding)
             changed=cli.update(candidate)
             self.assertIn('skills/harness-dev/agents/openai.yaml',[x['path'] for x in changed['skill_behavior_changes']])
             self.assertEqual(changed['permission_migration']['binding_changes'][0]['after']['url'],'http://localhost:9200/mcp')
@@ -465,13 +490,15 @@ class HarnessCase(unittest.TestCase):
         release=self.fake_release();vendor=release/'vendor/example';vendor.mkdir(parents=True)
         (vendor/'README.md').write_text('actual target file bytes')
         (vendor/'AGENTS.md').symlink_to('README.md')
-        write_json(release/'manifests/source-trees.json',{'example':{'files':{
+        trees=read_json(release/'manifests/source-trees.json');trees['example']={'files':{
             'README.md':{'kind':'file','sha256':sha(b'actual target file bytes')},
-            'AGENTS.md':{'kind':'symlink','target':'README.md'}}}})
+            'AGENTS.md':{'kind':'symlink','target':'README.md'}}}
+        write_json(release/'manifests/source-trees.json',trees)
         (release/'reports').mkdir()
-        write_json(release/'reports/acceptance-summary.json',{'status':'PASS_WITH_OPTIONAL_BLOCK','categories':{'runtime':'PASS','provider':'UNVERIFIED'}})
+        write_json(release/'reports/acceptance-summary.json',{'release_hash':cli.release_hash(release),'status':'PASS_WITH_OPTIONAL_BLOCK','categories':{'runtime':'PASS','provider':'UNVERIFIED'},'raw_response':'PRIVATE_SUMMARY_SENTINEL'})
         (release/'reports/known-limitations.md').write_text('Provider generation remains UNVERIFIED.\n')
         (release/'reports/raw-runtime.json').write_text('PRIVATE_RUNTIME_SENTINEL')
+        (release/'reports/final-mcp-runtime-smoke-3.1.0.json').write_text('PRIVATE_OLD_RESPONSE_SENTINEL')
         destination=self.base/'links.tar.gz'
         with patch.object(cli,'ROOT',release):cli.package(destination)
         import tarfile
@@ -484,6 +511,8 @@ class HarnessCase(unittest.TestCase):
         self.assertIn('reports/acceptance-summary.json',(root/'SHA256SUMS').read_text())
         self.assertIn('reports/known-limitations.md',(root/'SHA256SUMS').read_text())
         self.assertFalse((root/'reports/raw-runtime.json').exists())
+        self.assertFalse((root/'reports/final-mcp-runtime-smoke-3.1.0.json').exists())
+        self.assertNotIn('PRIVATE_SUMMARY_SENTINEL',(root/'reports/acceptance-summary.json').read_text())
         self.assertEqual(read_json(root/'package-manifest.json')['acceptance_summary']['status'],'PASS_WITH_OPTIONAL_BLOCK')
         link=read_json(root/'package-manifest.json')['files']['vendor/example/AGENTS.md']
         self.assertEqual(link,{'kind':'symlink','target':'README.md','sha256_target':sha(b'README.md')})
@@ -640,6 +669,151 @@ class HarnessCase(unittest.TestCase):
         self.assertIsNone(clean['facts'])
         self.assertEqual(clean['facts_status'],'AGENT_SUMMARY_REQUIRED')
 
+    def test_precompact_does_not_resign_changed_ignored_evidence(self):
+        self.context_task()
+        # Ignored local evidence must remain a recovery guard, outside Git's view.
+        (self.repo/'.git/info/exclude').write_text('local-evidence/\n')
+        evidence=self.repo/'local-evidence';evidence.mkdir()
+        spec=evidence/'spec.md';spec.write_text('Approved acceptance\n')
+        checks=evidence/'checks.json';checks.write_text('{"status":"PASS"}\n')
+        facts=self.task_facts();facts['spec_refs']=['local-evidence/spec.md']
+        facts['tests'][0]['evidence']='local-evidence/checks.json'
+        for reference,conflict in [(spec,'SPEC_REFS_CHANGED'),(checks,'TEST_EVIDENCE_CHANGED')]:
+            with self.subTest(reference=reference.name):
+                context.checkpoint(self.repo,'ctx',facts)
+                reference.write_text(reference.read_text()+'changed\n')
+                self.assertIn(conflict,context.verify(self.repo,'ctx')['conflicts'])
+                result=context.checkpoint(self.repo,'ctx',reason='precompact')
+                self.assertEqual(result['status'],'CHECKPOINT_PARTIAL')
+                self.assertIn('AGENT_SUMMARY_REQUIRED',context.verify(self.repo,'ctx')['conflicts'])
+
+
+    def test_checkpoint_binds_named_plan_and_preserves_it_for_automatic_recovery(self):
+        self.context_task()
+        (self.repo/'.git/info/exclude').write_text('.planning/\n')
+        plan=self.repo/'.planning/recovery-plan';plan.mkdir(parents=True)
+        for name in ['task_plan','findings','progress']:(plan/(name+'.md')).write_text(name+'\n')
+        facts=self.task_facts()
+        with patch.dict(os.environ,{'PLAN_ID':'another-task','PWF_PLAN_ROOT':str(self.base)}):
+            context.checkpoint(self.repo,'ctx',facts,plan_id='recovery-plan')
+            doc=context.load_checkpoint(self.repo,'ctx')
+            self.assertEqual([r['path'] for r in doc['pwf']],[
+                '.planning/recovery-plan/task_plan.md', '.planning/recovery-plan/findings.md',
+                '.planning/recovery-plan/progress.md'])
+            self.assertTrue(all(r['status']=='PRESENT' for r in doc['pwf']))
+            self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_READY')
+        (plan/'progress.md').write_text('Work changed while ignored by Git\n')
+        self.assertIn('PWF_CHANGED',context.verify(self.repo,'ctx')['conflicts'])
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        self.assertEqual(context.load_checkpoint(self.repo,'ctx')['plan_id'],'recovery-plan')
+        context.checkpoint(self.repo,'ctx',facts)
+        self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+
+
+    def test_checkpoint_rejects_invalid_or_incomplete_plan_without_overwriting(self):
+        self.context_task();facts=self.task_facts()
+        context.checkpoint(self.repo,'ctx',facts)
+        checkpoint=self.repo/'.harness/task/ctx/context-checkpoint.json'
+        before=checkpoint.read_bytes()
+        incomplete=self.repo/'.planning/incomplete';incomplete.mkdir(parents=True)
+        (incomplete/'task_plan.md').write_text('Only one file\n')
+        outside=self.base/'outside-plan';outside.mkdir()
+        for name in ['task_plan','findings','progress']:(outside/(name+'.md')).write_text('Outside\n')
+        (self.repo/'.planning/linked').symlink_to(outside,target_is_directory=True)
+        for selector in ['../outside-plan',str(outside),'','missing','incomplete','linked']:
+            with self.subTest(selector=selector):
+                with self.assertRaises(HarnessError):context.checkpoint(self.repo,'ctx',facts,plan_id=selector)
+                self.assertEqual(checkpoint.read_bytes(),before)
+
+
+    def test_checkpoint_cli_forwards_named_plan(self):
+        release=self.fake_release()
+        with patch.object(cli,'ROOT',release):cli.enable(self.repo,'L1')
+        self.context_task()
+        plan=self.repo/'.planning/cli-plan';plan.mkdir(parents=True)
+        for name in ['task_plan','findings','progress']:(plan/(name+'.md')).write_text(name+'\n')
+        facts=self.repo/'.harness/task/ctx/facts.json';write_json(facts,self.task_facts())
+        result=subprocess.run(['python3',str(release/'bin/harness'),'context','checkpoint',str(self.repo),
+                               '--task','ctx','--facts',str(facts),'--plan-id','cli-plan'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr+result.stdout)
+        self.assertEqual(json.loads(result.stdout)['status'],'CHECKPOINT_READY')
+        self.assertEqual(context.load_checkpoint(self.repo,'ctx')['plan_id'],'cli-plan')
+
+
+    def test_precompact_does_not_resign_branch_change(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        self.git('checkout','-qb','another-branch')
+        self.assertIn('BRANCH_CHANGED',context.verify(self.repo,'ctx')['conflicts'])
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+
+
+    def test_legacy_checkpoint_without_plan_binding_retains_task_directory(self):
+        self.context_task()
+        plan=self.repo/'.planning/ctx';plan.mkdir(parents=True)
+        for name in ['task_plan','findings','progress']:(plan/(name+'.md')).write_text(name+'\n')
+        with patch.dict(os.environ,{'PLAN_ID':'unrelated','PWF_PLAN_ROOT':str(self.base)}):
+            context.checkpoint(self.repo,'ctx',self.task_facts())
+            old=context.load_checkpoint(self.repo,'ctx');old.pop('plan_id')
+            path=self.repo/'.harness/task/ctx'
+            write_json(path/'context-checkpoint.json',old)
+            write_json(path/'context-checkpoint.sha256.json',{'sha256':sha(canonical(old))})
+            self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_READY')
+            self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+            self.assertEqual(context.load_checkpoint(self.repo,'ctx')['pwf'][0]['path'],'.planning/ctx/task_plan.md')
+
+
+    def test_checkpoint_never_reuses_other_task_or_project_binding(self):
+        self.context_task()
+        plan=self.repo/'.planning/private-plan';plan.mkdir(parents=True)
+        for name in ['task_plan','findings','progress']:(plan/(name+'.md')).write_text(name+'\n')
+        context.checkpoint(self.repo,'ctx',self.task_facts(),plan_id='private-plan')
+        other_repo=self.base/'other-project';shutil.copytree(self.repo,other_repo)
+        self.assertEqual(context.checkpoint(other_repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        self.assertIsNone(context.load_checkpoint(other_repo,'ctx')['plan_id'])
+        workflow.create(self.repo,'other-task','L1','development')
+        workflow.transition(self.repo,'other-task','D00','classify')
+        workflow.transition(self.repo,'other-task','A01','development')
+        for name in ['context-checkpoint.json','context-checkpoint.sha256.json']:
+            shutil.copyfile(self.repo/'.harness/task/ctx'/name,self.repo/'.harness/task/other-task'/name)
+        self.assertEqual(context.checkpoint(self.repo,'other-task',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        self.assertIsNone(context.load_checkpoint(self.repo,'other-task')['plan_id'])
+
+
+    def test_switching_plan_requires_fresh_facts(self):
+        self.context_task()
+        for selector in ['first-plan','second-plan']:
+            plan=self.repo/'.planning'/selector;plan.mkdir(parents=True)
+            for name in ['task_plan','findings','progress']:(plan/(name+'.md')).write_text(name+'\n')
+        context.checkpoint(self.repo,'ctx',self.task_facts(),plan_id='first-plan')
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact',plan_id='second-plan')['status'],'CHECKPOINT_PARTIAL')
+        self.assertIn('AGENT_SUMMARY_REQUIRED',context.verify(self.repo,'ctx')['conflicts'])
+        context.checkpoint(self.repo,'ctx',self.task_facts())
+        self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+
+
+
+
+    def test_recreated_same_task_never_inherits_old_checkpoint(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        path=workflow.task_path(self.repo,'ctx');old=context.load_checkpoint(self.repo,'ctx')
+        (path/'events.jsonl').unlink()
+        self.context_task()
+        self.assertEqual(workflow.load(path)['revision'],old['workflow_revision'])
+        self.assertIn('TASK_INSTANCE_CHANGED_OR_UNKNOWN',context.verify(self.repo,'ctx')['conflicts'])
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        self.assertIsNone(context.load_checkpoint(self.repo,'ctx')['facts'])
+
+    def test_checkpoint_without_task_instance_requires_fresh_facts(self):
+        self.context_task();context.checkpoint(self.repo,'ctx',self.task_facts())
+        old=context.load_checkpoint(self.repo,'ctx');old.pop('task_instance')
+        path=workflow.task_path(self.repo,'ctx')
+        write_json(path/'context-checkpoint.json',old)
+        write_json(path/'context-checkpoint.sha256.json',{'sha256':sha(canonical(old))})
+        self.assertIn('TASK_INSTANCE_CHANGED_OR_UNKNOWN',context.verify(self.repo,'ctx')['conflicts'])
+        self.assertEqual(context.checkpoint(self.repo,'ctx',reason='precompact')['status'],'CHECKPOINT_PARTIAL')
+        context.checkpoint(self.repo,'ctx',self.task_facts())
+        self.assertEqual(context.verify(self.repo,'ctx')['status'],'RESUME_OK')
+
     def test_checkpoint_rejects_secret_invalid_result_and_symlink(self):
         self.context_task();facts=self.task_facts();facts['next_action']='OPENAI_API_KEY=TEST_SECRET_DO_NOT_USE_1234567890'
         with self.assertRaisesRegex(HarnessError,'credentials'):context.checkpoint(self.repo,'ctx',facts)
@@ -706,12 +880,16 @@ class HarnessCase(unittest.TestCase):
         context.checkpoint(self.repo,'ctx',facts)
         with self.assertRaisesRegex(HarnessError,'workers'):memory.handoff(self.repo,context.load_checkpoint(self.repo,'ctx'))
 
-    def test_start_automatically_initializes_new_project_with_l2(self):
+    def test_start_previews_then_explicitly_prepares_new_project_with_l2(self):
         import sys
         release=self.fake_release();project=self.base/'auto-start';project.mkdir()
         (project/'user.txt').write_text('original')
         process=subprocess.run([sys.executable,str(release/'bin/harness'),'start'],cwd=project,capture_output=True)
         self.assertEqual(process.returncode,0,process.stderr.decode())
+        self.assertEqual(json.loads(process.stdout)['status'],'PREPARATION_REQUIRED')
+        self.assertFalse((project/'.git').exists());self.assertFalse((project/'.codex').exists())
+        process=subprocess.run([sys.executable,str(release/'bin/harness'),'start','--apply'],cwd=project,capture_output=True)
+        self.assertEqual(process.returncode,0,process.stderr.decode()+process.stdout.decode())
         binding=read_json(project/'.harness/state/project.json')
         self.assertEqual(binding['profile'],'L2');self.assertEqual((project/'user.txt').read_text(),'original')
         events=read_json(project/'.codex/hooks.json')['hooks']
@@ -767,7 +945,9 @@ class HarnessCase(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('harness_context_hook_test',path)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         payload={'cwd':str(self.repo),'hook_event_name':'PostCompact','session_id':'session-test'}
-        with patch.object(module.cli,'select_project',return_value=self.repo),patch.object(module.cli,'project_binding',return_value={}):
+        # Candidate checks suppress real lifecycle hooks globally. This direct
+        # adapter test must explicitly exercise the enabled branch itself.
+        with patch.dict(os.environ,{'PLANNING_DISABLED':'0'}),patch.object(module.cli,'select_project',return_value=self.repo),patch.object(module.cli,'project_binding',return_value={}):
             with patch.object(module.context,'choose_task',side_effect=HarnessError('No active Harness task for this session')):
                 self.assertTrue(module.handle(payload)['continue'])
             with patch.object(module.context,'choose_task',side_effect=HarnessError('Choose --task explicitly; multiple active Harness tasks exist for this session')):

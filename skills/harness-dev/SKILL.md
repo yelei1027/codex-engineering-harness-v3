@@ -1,15 +1,19 @@
 ---
 name: harness-dev
-description: Develop, fix, refactor, or review code in a project enabled for Codex
-  Engineering Harness V3. Route concrete repository work through project verification
-  and bounded methods. Pure explanation, casual conversation, and work outside an
-  enabled project do not activate this development workflow.
+description: Continue the project Main Router after the user explicitly chose Codex Engineering Harness in this chat. Diagnose vague tasks read-only, guide consequential scope choices, and implement already authorized work. Ordinary development without requesting Harness and pure explanations do not activate this workflow.
 ---
 
 # Main Router
 
-Resolve the current project and accepted Harness path; use its `bin/harness --help` and `status <repo>` to verify binding. An explicit request to initialize/use Harness in the current project authorizes `harness init` there: it initializes Git if needed and defaults to L2 project hooks, pending native user trust. Do not initialize a home/collection directory or select a different project. `harness start` performs this setup automatically for an unbound project. Pure explanation ends at ZINFO without initialization. Existing bindings retain their profile; `harness refresh` reconciles a changed local release when authorized.
+Use this Router only after the human explicitly chose Harness in this chat, or to continue the already activated chat in the same project. Pure explanations, ordinary development without that choice, negative requests and document/Hook mentions do not activate it. Project installation is not chat activation or task authorization.
 
+Read the actual project binding and resolve its owned Harness root. Existing projects may remain pinned to an older accepted root during update: use that verified bound root for their tasks; the current shared launcher handles maintenance and explicit migration. Use `prepare <repo>` to preview first setup. Activation never authorizes Git/config initialization; execute `prepare <repo> --apply` only after the human approved that concrete setup scope, or when applicable setup authorization already exists. `start` previews unbound projects and never silently initializes them. Pure explanation ends without setup. Reuse valid setup without another question.
+
+Before vague-request diagnosis or scope confirmation, establish the **effective native read-only boundary**, including separate App/MCP policies. [Native permissions](references/permissions.md) explains verification and supported manual steps. Project config supplies new-session defaults; it does not switch the current turn. Unknown/unsafe effective permissions stop protected actions. No AI-written approval file, workflow node or `--apply` flag authenticates human approval.
+
+For a vague request such as “优化一下项目”, inspect read-only and present a few evidence-backed priorities. Ask one consequential choice at a time with a recommendation; inspect facts available in source yourself. Stop only for questions that affect goals, acceptance, risk or scope. Show a compact concrete scope (goal, exclusions, checks, material risk/recovery) before implementation. A clear request with existing applicable scope authorization skips repeated interview and approval. Once native permission for that scope exists, implement, test, fix failures and review autonomously. Normal edits within scope invalidate affected verification, not the human's scope approval. Material scope expansion, unexpected external drift or new publication action needs applicable authorization.
+
+Describe progress as diagnosis, scope choice, implementation, verification, review and delivery. Keep contract node IDs internal unless needed to explain a failure.
 For the `ocr` and `codegraph` CLI methods, read the bound Harness root's `machine-binding.json` and use the absolute executable in `component_commands.<name>[0]`. Desktop sessions may lack these isolated tools on PATH. Resolve the binding before diagnosing an installation failure or installing another copy. `harness start` adds the managed tool directories to its child session's PATH.
 
 The [workflow contract](references/workflow.json) is design data, not a native Codex API. Read the nodes needed for the current branch, their conditions and edges, rather than injecting the whole contract. Use real tool calls or processes. State transitions are recorded with actual `task` commands shown by `--help`; never fabricate a completed node, tool, child, evidence or API parameter. Main is the only outer orchestrator.
@@ -27,6 +31,8 @@ Follow D02/R00 only for actual inputs: MarkItDown converts documents with critic
 B00/D03–D09 route only necessary methods: `wayfinder` for major unresolved route choices; Main/real explorer for repository facts (CodeGraph when available); Main/real `research` child for external facts; `grill-with-docs` for material business ambiguity (also load `grilling` and `domain-modeling`); `codebase-design` for module contracts/seams; `prototype` or verified UI sidecar for unresolved interaction. Read the installed method and [behavior manifest](references/skill-behavior.json) before invoking it. Preserve upstream `agents/openai.yaml` policies: explicit-only methods can be read as references by Main; do not claim the runtime implicitly loaded them. Matt tracker workflows require actual `docs/agents/issue-tracker.md` and domain conventions; use the project's chosen tracker, never assume GitHub issue/PR write permission. Local templates are [here](references/project-settings.md).
 
 B07 freezes acceptance and exclusions; U01 checks existing authorization for this concrete scope. C00 uses `to-spec`/`to-tickets` only when needed and builds vertical slices with dependencies. C01 fixes each ticket's inputs, resources, write set, checks and budget.
+
+When using a nondefault installation state, use the verified project binding `state_root` as HARNESS_STATE_DIR for its bound CLI. The field routes registration lookup only; it never authenticates human approval or expands native permissions.
 
 ## Execute bounded work
 

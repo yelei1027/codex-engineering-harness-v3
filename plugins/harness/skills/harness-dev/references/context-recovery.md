@@ -1,7 +1,9 @@
 # Context checkpoints and provider routing
 
-`harness init` and first `harness start` initialize the actual current project and
-default to L2. Bind one task/PLAN_ID per Main session. Explicit `--profile L0` or
+First `harness start` previews the current project's preparation without writing
+configuration or initializing Git. After approving that concrete scope, use
+`harness prepare --apply` (or explicitly authorized `harness init`); preparation
+defaults to L2. Bind one task/PLAN_ID per Main session. Explicit `--profile L0` or
 `--profile L1` opts out of hooks; installation profile and task risk are independent.
 Review new/changed definitions through native `/hooks`; registration is not trust.
 
@@ -12,7 +14,7 @@ checkpoint at milestones/before compact. Do not parse/copy full transcripts to
 guess percentages. `harness context status . --used-percent 80` evaluates a real
 host reading supplied by the caller; it is not an autonomous token monitor.
 
-Before compact, update task-specific `.planning/<task-id>/task_plan.md`,
+Before compact, update the selected `.planning/<plan-id>/task_plan.md`,
 `findings.md`, and `progress.md` when PWF is used. Record a concise JSON summary
 in `.harness/task/<task-id>/context-facts.json` with exactly these fields:
 
@@ -39,9 +41,22 @@ invent results or mark unknown workers complete. Missing facts prevent READY.
 
 ```bash
 harness context checkpoint . --task TASK --facts .harness/task/TASK/context-facts.json --resume-node T00 --session ACTUAL_SESSION_ID
+# When using PWF, bind its selected ID explicitly (it may differ from TASK):
+harness context checkpoint . --task TASK --facts .harness/task/TASK/context-facts.json --plan-id PLAN_ID --resume-node T00
 # Same objective: use native /compact, then:
 harness context verify . --task TASK
 ```
+
+`--plan-id` selects only `.planning/<ID>/` in this repository and requires all
+three planning files. The checkpoint preserves that binding for later manual
+and automatic checkpoints. Without the selector, a verified same-project/task
+checkpoint retains its binding; otherwise the legacy `.planning/<task-id>/`
+path applies. Host environment selectors and shared active-plan pointers do not
+select checkpoint references. Legacy callers may omit planning files.
+
+Automatic fact reuse requires unchanged Git, branch, workflow and recorded
+Spec/test/PWF hashes, including Git-ignored evidence. A changed reference or
+plan binding produces `CHECKPOINT_PARTIAL`; provide fresh facts before resuming.
 
 Choose a resume node allowed by the contract. The checkpoint captures Git
 branch/HEAD (or an empty tree before the first commit), staged/unstaged/untracked

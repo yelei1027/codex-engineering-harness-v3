@@ -1,5 +1,5 @@
 {
-  "managed_source_root": "/home/yelei/文档/gpt/linux/codex-engineering-harness",
+  "managed_source_root": "Resolved installation root; never a baked-in developer path",
   "state_root": "~/.local/share/codex-engineering-harness",
   "ownership_rule": "Exact transaction touch_set only; unknown content never overwritten; post-transaction user modifications block rollback",
   "registration_owners": {
@@ -12,6 +12,6 @@
     "markitdown": "Harness project MCP",
     "screenshot-to-code": "loopback sidecar"
   },
-  "user_config": "No global Codex configuration changes authorized by this installation route; existing Interrupt hook retained",
-  "sources_lock": "reports/upstream-lock.json"
+  "user_config": "Only exact owned overlay, global entry skill and launcher; unrelated configuration and native Hook trust remain user-owned",
+  "sources_lock": "manifests/source-trees.json"
 }

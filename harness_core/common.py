@@ -44,18 +44,30 @@ def atomic(path, data, mode=0o600):
         if os.path.exists(temp):
             os.unlink(temp)
 
+def json_bytes(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2).encode()+b'\n'
+
 def write_json(path, value):
-    atomic(path, json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2).encode() + b'\n')
+    atomic(path,json_bytes(value))
 
 def state_dir():
     return Path(os.environ.get('HARNESS_STATE_DIR', str(Path.home()/'.local/share/codex-engineering-harness'))).absolute()
 
 @contextlib.contextmanager
-def lock(path):
+def lock(path,shared=False):
+    path=Path(path)
+    if path.name in {'preparation.lock','services.lock'} and path.parent.name=='.harness-install':
+        # Locks must survive moving/removing the installation's own metadata.
+        if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+            raise HarnessError('Lifecycle lock path has a symlink')
+        from .sidecars import owner_state
+        path=owner_state(path.parent.parent)/'root-locks'/sha(str(path.parent.parent).encode())[:16]/path.name
+        if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+            raise HarnessError('Lifecycle state lock path has a symlink')
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'a') as stream:
         try:
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(stream, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         except BlockingIOError:
             raise HarnessError(f'Another Harness operation holds {path}')
         yield
@@ -103,3 +115,26 @@ def private_path(path):
     return (any(p in {'.git', 'node_modules', '__pycache__', '.venv', '.harness', '.harness-artifacts', '.codegraph', '.harness-install', 'dist', 'cache', 'runtimes', 'private', '.test-projects', 'candidate-private'} for p in parts)
         or name in {'machine-binding.json', 'services-binding.json', 'auth.json', 'credentials.json', 'id_rsa', 'id_ed25519'}
         or name == '.env' or name.startswith('.env.') or name.endswith(('.db', '.sqlite', '.sqlite3', '.pem', '.key', '.pyc', '.db-wal', '.db-shm', '.sqlite-wal', '.sqlite-shm', '.sqlite3-wal', '.sqlite3-shm')))
+
+PWF_CODEX_HOOK_FILES=frozenset(['codex_hook_adapter.py', 'context_frame.py', 'permission_request.py', 'plugin_dispatch.py', 'post-tool-use.sh', 'post_tool_use.py', 'pre-compact.sh', 'pre-tool-use.sh', 'pre_tool_use.py', 'pwf-hook.cmd', 'resolve-plan-dir.sh', 'run_sh.py', 'session-start.sh', 'stop.py', 'stop.sh', 'user-prompt-submit.sh'])
+PWF_CODEX_SKILL_FILES=frozenset(['SKILL.md', 'references/examples.md', 'references/reference.md', 'scripts/attest-plan.ps1', 'scripts/attest-plan.sh', 'scripts/check-complete.ps1', 'scripts/check-complete.sh', 'scripts/gate-stop.sh', 'scripts/init-session.ps1', 'scripts/init-session.sh', 'scripts/inject-plan.py', 'scripts/inject-plan.sh', 'scripts/ledger-summary.sh', 'scripts/plan-doctor.sh', 'scripts/resolve-plan-dir.ps1', 'scripts/resolve-plan-dir.sh', 'scripts/session-catchup.py', 'scripts/set-active-plan.ps1', 'scripts/set-active-plan.sh', 'scripts/skill-hook.sh', 'templates/analytics_findings.md', 'templates/analytics_task_plan.md', 'templates/findings.md', 'templates/loop.md', 'templates/progress.md', 'templates/task_plan.md'])
+PWF_CODEX_RUNTIME_FILES=frozenset({".codex/hooks/"+n for n in PWF_CODEX_HOOK_FILES} | {".codex/skills/planning-with-files/"+n for n in PWF_CODEX_SKILL_FILES})
+
+def distribution_path(path):
+    """Positive release boundary; planning remains available to local review."""
+    path=Path(path);parts=path.parts
+    if not parts or private_path(path) or any(p in {'.planning','sessions'} for p in parts):return False
+    if '.codex' in parts:
+        # Only this pinned dependency's exact runtime files and their directory
+        # ancestors are distributable; user configuration and unknown code are not.
+        if parts[:2]!=('vendor','planning-with-files'):return False
+        relative='/'.join(parts[2:])
+        return relative in PWF_CODEX_RUNTIME_FILES or any(name.startswith(relative+'/') for name in PWF_CODEX_RUNTIME_FILES)
+    directories={'harness_core','bin','skills','plugins','manifests','templates','scripts','tests','docs','third-party-licenses','vendor'}
+    files={'VERSION','harness.lock','plugin.json','LICENSE','THIRD_PARTY_NOTICES','SECURITY.md','AGENTS.md','README.md','INSTALLATION.md','.gitignore'}
+    if parts[0]=='reports':return str(path) in {'reports/acceptance-summary.json','reports/known-limitations.md'}
+    if parts[0]=='contracts':return len(parts)==1 or str(path)=='contracts/workflow.json'
+    if parts[0] in directories:return True
+    if len(parts)==1 and parts[0] in files:return True
+    return str(path) in {'.agents','.agents/plugins','.agents/plugins/marketplace.json',
+                         '.codex-plugin','.codex-plugin/plugin.json'}

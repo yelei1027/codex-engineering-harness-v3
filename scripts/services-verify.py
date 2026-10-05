@@ -1,120 +1,90 @@
 #!/usr/bin/env python3
-"""Refresh actual local service evidence without exposing provider secrets."""
+"""Verify this owned deployment; keep fixtures and evidence outside runtime software."""
+import sys
+sys.dont_write_bytecode=True
 import argparse
-from datetime import datetime, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 from urllib.request import urlopen
-from services_common import ROOT, PINS, verify_source
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--document-layout', action='store_true')
-args = parser.parse_args()
-reports = ROOT / 'reports'
-reports.mkdir(exist_ok=True)
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
+from harness_core import sidecars
+from harness_core.common import HarnessError,lock,read_json,write_json
+from harness_core.service_reports import prepare_outputs
 
-def run(command, **kwargs):
-    return subprocess.run(command, text=True, capture_output=True, **kwargs)
 
-def json_command(command, destination, env=None):
-    result = run(command, env=env)
+def execute(argv,env):
+    result=subprocess.run(argv,env=env,capture_output=True,text=True,timeout=90)
+    if result.returncode:raise HarnessError('验证命令失败；受管服务和数据已保留。检查该组件后重试：'+Path(argv[0]).name)
+    return result.stdout
+
+
+def json_command(argv,env):
+    try:return json.loads(execute(argv,env))
+    except ValueError:raise HarnessError('验证结果不是有效JSON；未改服务接入配置')
+
+
+def verify(document_layout=False):
+    env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'}
+    reports, _ = prepare_outputs(ROOT)
+    with lock(ROOT/'.harness-install/services.lock'):
+        layout=sidecars.layout(ROOT)
+        if not layout:raise HarnessError('当前安装尚未准备服务；先完成组件准备')
+        sidecars._manage(ROOT,'status')
+        if sidecars.unowned_resource_consumers(ROOT):raise HarnessError('有未知消费者引用本安装资源；保留并先核对归属')
+        for group in sidecars.GROUPS:
+            owned=sidecars.inspect_owned(ROOT,group);sidecars.inspect_volumes(ROOT,group)
+            if len(owned)!=len(sidecars.GROUPS[group]) or any(c['state']!='running' for c in owned):
+                raise HarnessError('受管服务未全部运行；用 harness services start 后重试')
+        sidecars.verify_image_tags(layout)
+        binding=read_json(ROOT/'services-binding.json',{})
+        expected={'powercontext':f'http://127.0.0.1:{layout["ports"]["powercontext"]}',
+                  'screenshot_backend':f'http://127.0.0.1:{layout["ports"]["screenshot-backend"]}',
+                  'screenshot_frontend':f'http://127.0.0.1:{layout["ports"]["screenshot-frontend"]}'}
+        if binding.get('service_urls')!=expected:raise HarnessError('服务接入与当前受管部署不一致；保留原配置并核对')
+        client=ROOT/'runtimes/powercontext/client-venv/bin'
+        pc=layout['namespace']+'-powercontext';backend=layout['namespace']+'-screenshot-backend'
+        host=json_command([str(client/'powercontext'),'doctor','--server-url',expected['powercontext'],'--json'],env)
+        container=json_command(['docker','exec',pc,'powercontext','doctor','--server-url','http://127.0.0.1:8000','--json'],env)
+        write_json(reports/'powercontext-host-doctor.json',host);write_json(reports/'powercontext-container-doctor.json',container)
+        for name in ['services-smoke.py','services-mcp-smoke.py']:
+            execute([str(client/'python'),str(ROOT/'scripts'/name)],env)
+        remote='/tmp/harness-owned-screenshot-smoke.py'
+        execute(['docker','cp',str(ROOT/'scripts/services-screenshot-smoke.py'),backend+':'+remote],env)
+        runner='import sys,runpy;sys.path.insert(0,"/app");runpy.run_path("'+remote+'",run_name="__main__")'
+        execute(['docker','exec','-e','PYTHONDONTWRITEBYTECODE=1',backend,'poetry','run','python','-c',runner],env)
+        for name in ['screenshot-preview.png','screenshot-smoke.json']:
+            execute(['docker','cp',backend+':/tmp/'+name,str(reports/name)],env)
+        if document_layout:
+            execute(['docker','cp',str(ROOT/'docs/codex_engineering_harness_v3_formal_manual.html'),backend+':/tmp/harness-formal-manual.html'],env)
+            execute(['docker','cp',str(ROOT/'scripts/services-document-layout.py'),backend+':/tmp/services-document-layout.py'],env)
+            execute(['docker','exec','-e','PYTHONDONTWRITEBYTECODE=1',backend,'poetry','run','python','/tmp/services-document-layout.py'],env)
+            previews=reports/'document-previews';previews.mkdir(exist_ok=True)
+            execute(['docker','cp',backend+':/tmp/document-previews/.',str(previews)],env)
+        smoke=read_json(reports/'powercontext-smoke.json',{});mcp=read_json(reports/'powercontext-mcp.json',{});screenshot=read_json(reports/'screenshot-smoke.json',{})
+        endpoints={}
+        for name,url in expected.items():
+            with urlopen(url+('/health/ready' if name=='powercontext' else '/'),timeout=15) as response:
+                endpoints[name]={'status_code':response.status}
+        result={'status':'PASS' if host.get('ok') and container.get('ok') and all(d.get('status')=='PASS' for d in [smoke,mcp,screenshot]) else 'FAIL',
+                'scope':'OWNED_LOCAL_BASIC_AND_RENDERER; no GUI/human approval/Full Provider acceptance',
+                'namespace':layout['namespace'],'service_urls':expected,'endpoints':endpoints,
+                'powercontext':{'scope_id':smoke.get('scope_id'),'basic_independent_recall':smoke.get('handoff',{}).get('independent_recall',{}).get('status'),'mcp_tool_count':len(mcp.get('tools',[])),'full_automatic_memory':'NOT_TESTED'},
+                'screenshot_to_code':screenshot,'hook_trust':'NOT_INSPECTED','binding_changes':'NONE'}
+        if document_layout:
+            document=read_json(reports/'document-previews/document-validation.json',{})
+            result['formal_document_layout']={'status':document.get('status','UNVERIFIED')}
+            if document.get('status')!='PASS':result['status']='FAIL'
+        write_json(reports/'services.json',result)
+        return result
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--document-layout',action='store_true');args=parser.parse_args()
     try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        data = {'status': 'FAIL', 'stdout': result.stdout}
-    data['exit_code'] = result.returncode
-    data['stderr'] = result.stderr
-    (reports / destination).write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n')
-    return data
-
-def get(url, json_response=True):
-    with urlopen(url, timeout=30) as response:
-        data = response.read()
-        return json.loads(data) if json_response else {'status_code': response.status, 'bytes': len(data)}
-
-client = ROOT / 'runtimes/powercontext/client-venv/bin'
-host_doctor = json_command([str(client/'powercontext'), 'doctor', '--server-url', 'http://127.0.0.1:18080', '--json'], 'powercontext-host-doctor.json')
-container_doctor = json_command(['docker', 'exec', 'codex-harness-powercontext', 'powercontext', 'doctor', '--server-url', 'http://127.0.0.1:8000', '--json'], 'powercontext-container-doctor.json')
-codex_env = {**os.environ, 'PATH': str(ROOT/'runtimes/powercontext/bin')+':'+os.environ['PATH']}
-# Use the installed desktop binary rather than the sandboxed snap launcher.
-codex_dir = ROOT/'runtimes/powercontext/bin'
-codex_dir.mkdir(exist_ok=True)
-codex_link = codex_dir/'codex'
-desktop = Path('/usr/lib/chatgpt/resources/codex')
-if desktop.exists() and not codex_link.exists():
-    codex_link.symlink_to(desktop)
-codex_doctor = json_command([str(client/'powercontext'), 'doctor', 'codex', '--json'], 'powercontext-codex-doctor.json', env=codex_env)
-codex_doctor['codex_binary'] = str(codex_link.resolve())
-version = run([str(codex_link), '--version'])
-codex_doctor['codex_version'] = version.stdout.strip()
-(reports/'powercontext-codex-doctor.json').write_text(json.dumps(codex_doctor, ensure_ascii=False, indent=2)+'\n')
-for script in ['services-smoke.py', 'services-mcp-smoke.py']:
-    command = run([str(client/'python'), str(ROOT/'scripts'/script)])
-    if command.returncode:
-        raise SystemExit(command.stderr or command.stdout)
-
-subprocess.run(['docker','cp',str(ROOT/'scripts/services-screenshot-smoke.py'),'codex-harness-screenshot-backend:/app/harness_screenshot_smoke.py'], check=True)
-subprocess.run(['docker','exec','codex-harness-screenshot-backend','poetry','run','python','/app/harness_screenshot_smoke.py'], check=True)
-for filename in ['screenshot-preview.png', 'screenshot-smoke.json']:
-    subprocess.run(['docker','cp',f'codex-harness-screenshot-backend:/tmp/{filename}',str(reports/filename)], check=True)
-if args.document_layout:
-    subprocess.run(['docker','cp',str(ROOT/'docs/codex_engineering_harness_v3_formal_manual.html'),'codex-harness-screenshot-backend:/tmp/harness-formal-manual.html'], check=True)
-    subprocess.run(['docker','cp',str(ROOT/'scripts/services-document-layout.py'),'codex-harness-screenshot-backend:/tmp/services-document-layout.py'], check=True)
-    subprocess.run(['docker','exec','codex-harness-screenshot-backend','poetry','run','python','/tmp/services-document-layout.py'], check=True)
-    previews = reports/'document-previews'
-    previews.mkdir(exist_ok=True)
-    subprocess.run(['docker','cp','codex-harness-screenshot-backend:/tmp/document-previews/.',str(previews)], check=True)
-
-containers = {}
-for name in ['powercontext', 'screenshot-backend', 'screenshot-frontend']:
-    item = json.loads(run(['docker','inspect',f'codex-harness-{name}']).stdout)[0]
-    image = json.loads(run(['docker','image','inspect',item['Image']]).stdout)[0]
-    ports = item['NetworkSettings']['Ports']
-    if any(binding['HostIp'] not in ['127.0.0.1','::1'] for bindings in ports.values() if bindings for binding in bindings):
-        raise RuntimeError('Service publish address is not loopback')
-    containers[name] = {'container': item['Name'].lstrip('/'), 'running': item['State']['Running'],
-        'health': item['State'].get('Health', {}).get('Status'), 'image_tag': item['Config']['Image'],
-        'image_id': item['Image'], 'repo_digests': image['RepoDigests'],
-        'published_ports': ports, 'named_volumes': [m['Name'] for m in item['Mounts'] if m['Type']=='volume']}
-
-smoke = json.loads((reports/'powercontext-smoke.json').read_text())
-mcp = json.loads((reports/'powercontext-mcp.json').read_text())
-screenshot = json.loads((reports/'screenshot-smoke.json').read_text())
-endpoints = {'powercontext_ready':get('http://127.0.0.1:18080/health/ready'),
-             'screenshot_backend':get('http://127.0.0.1:17001/',False),
-             'screenshot_frontend':get('http://127.0.0.1:15173/',False),
-             'screenshot_backend_capabilities':get('http://127.0.0.1:17001/api/capabilities'),
-             'screenshot_frontend_proxy':get('http://127.0.0.1:15173/api/capabilities')}
-result = {'status':'PASS' if all(c['running'] and c['health']=='healthy' for c in containers.values()) and host_doctor['ok'] and container_doctor['ok'] and smoke['status']=='PASS' and mcp['status']=='PASS' and screenshot['status']=='PASS' else 'FAIL',
-          'checked_at':datetime.now(timezone.utc).isoformat(), 'scope':'LOCAL_BASIC_EXPLICIT_MEMORY_AND_OPTIONAL_SIDECAR',
-          'sources':{name:verify_source(name) for name in PINS}, 'containers':containers, 'endpoints':endpoints,
-          'powercontext':{'status':'PASS','package_version':'0.0.0+g6b2f6e8','mcp_tool_count':len(mcp['tools']),
-                         'basic_handoff_independent_recall':smoke['handoff']['independent_recall']['status'],
-                         'full_automatic_memory':'NOT_ENABLED_PROVIDER_UNCONFIGURED',
-                         'upstream_full_plugin_doctor':codex_doctor['status'],
-                         'upstream_full_plugin_doctor_detail':'Basic direct HTTP MCP is verified independently. The upstream automatic integration plugin is not installed.',
-                         'evidence':['reports/powercontext-smoke.json','reports/powercontext-mcp.json','reports/powercontext-host-doctor.json','reports/powercontext-container-doctor.json','reports/powercontext-codex-doctor.json']},
-          'screenshot_to_code':screenshot,
-          'lifecycle':{'start':'python3 scripts/services.py start','stop':'python3 scripts/services.py stop',
-                       'retention':'Stop preserves all named data volumes. Runtime environments, machine binding, data volumes, credentials, and reports are private and excluded from portable package.',
-                       'build':'python3 scripts/services-build.py','verification':'python3 scripts/services-verify.py --document-layout'}}
-layout = reports/'document-previews/document-validation.json'
-if layout.exists():
-    visual = reports/'document-previews/visual-review.json'
-    result['formal_document_layout'] = {'status':json.loads(layout.read_text())['status'], 'report':str(layout.relative_to(ROOT))}
-    if visual.exists():
-        review = json.loads(visual.read_text())
-        current = all(hashlib.sha256((ROOT/p).read_bytes()).hexdigest()==h for p,h in review['images'].items())
-        result['formal_document_layout']['visual_review'] = {'status':'PASS' if current else 'REQUIRES_REFRESH', 'report':str(visual.relative_to(ROOT))}
-(reports/'services.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
-binding = {'private_machine_binding':True,'mcp_servers':{'powercontext':{'url':'http://127.0.0.1:18080/mcp/'}},
-           'component_commands':{'powercontext':[str(client/'powercontext'),'doctor','--server-url','http://127.0.0.1:18080','--json'],
-                                 'screenshot-to-code':['python3',str(ROOT/'scripts/services.py'),'status','--service','screenshot-to-code']},
-           'service_urls':{'powercontext':'http://127.0.0.1:18080','screenshot_backend':'http://127.0.0.1:17001','screenshot_frontend':'http://127.0.0.1:15173'}}
-binding_path = ROOT/'services-binding.json'
-binding_path.write_text(json.dumps(binding,ensure_ascii=False,indent=2)+'\n')
-binding_path.chmod(0o600)
-print(json.dumps({'status':result['status'],'report':'reports/services.json','generation':screenshot['generation']['status'],'codex_plugin_doctor':codex_doctor['status']}))
+        result=verify(args.document_layout);print(json.dumps({'status':result['status'],'report':'private/service-reports/services.json','generation':result['screenshot_to_code'].get('generation',{}).get('status')},ensure_ascii=False));sys.exit(0 if result['status']=='PASS' else 1)
+    except (HarnessError,OSError,ValueError,subprocess.TimeoutExpired) as error:
+        print(json.dumps({'status':'ERROR','error':str(error)},ensure_ascii=False));sys.exit(2)
