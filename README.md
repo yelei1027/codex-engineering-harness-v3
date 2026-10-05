@@ -294,8 +294,8 @@ PowerContext Full 自动 Memory、Embedding / Hybrid Search 是可选增强，�
 当前正式包：
 
 ```text
-v3.1.1
-codex-engineering-harness-3.1.1-linux-x86_64.tar.gz
+v3.2.0
+codex-engineering-harness-3.2.0-linux-x86_64.tar.gz
 SHA256：以同一 Release 中的 .sha256 附件为准；一键安装器会自动校验。
 ```
 
