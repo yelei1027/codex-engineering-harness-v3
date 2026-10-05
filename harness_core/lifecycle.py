@@ -60,13 +60,17 @@ def resource_plan(root):
                 if re.fullmatch(re.escape(path.stem)+r'\.cpython-[0-9]+(?:\.opt-[0-9]+)?\.pyc',cached.name):
                     if cached.is_symlink() or not cached.is_file():raise HarnessError('Source cache is not a regular file; preserve')
                     caches.append(str(cached.relative_to(root)))
+    from . import resource_systemd
+    gateway=resource_systemd.verify(root)
+    from . import resource_manager
+    public_ports=resource_manager.load(root)['ports'] if resource_manager.descriptor_path(root).exists() else (deployment['ports'] if deployment else {})
     areas=runtime['areas']
     # Canonical areas avoid moving the same retained DB twice with parent/child
     # runtime ownership records.
     areas=[a for a in areas if not any(Path(b) in Path(a).parents for b in areas)]
     return {'root':str(root),'software_files':{**source_files,**managed},'runtime_areas':areas,
             'source_cleanup':'MANAGED_ARCHIVE_FILES' if source else 'USER_SOURCE_CHECKOUT_PRESERVED','retained_source_caches':caches,
-            'deployment':deployment,'component_processes':process_plan,
+            'deployment':deployment,'component_processes':process_plan,'resource_gateway':gateway,'public_service_ports':public_ports,
             'preserved_data':{'local_install_data':str(state_dir()/'retained'/sidecars.root_id(root)),
                 'memory_volumes':deployment['data_namespace'] if deployment else 'NO_OWNED_SERVICE_VOLUMES',
                 'journals_and_backups':str(state_dir())}}
@@ -199,6 +203,10 @@ def _uninstall(root,apply=False):
         if record['retained_memory_services']:stopped=True
         for resource in plan['installations']:
             source=Path(resource['root']);selected=record['roots'][str(source)]
+            if resource.get('resource_gateway'):
+                from . import resource_systemd
+                with operation_scope(identifier):
+                    selected['resource_gateway']=resource_systemd.remove(source)
             selected['component_processes']=processes.stop(source)
             if resource['deployment']:
                 sidecars._manage(source,'remove');stopped=True;selected['services']='STOPPED_AND_REMOVED'
@@ -267,7 +275,23 @@ def uninstall(root,apply=False):
             path=Path(name)/'.harness/state/workflow.lock';safe_parent(path)
             if path.is_symlink():raise HarnessError('Workflow lock is a symlink')
             stack.enter_context(lock(path))
-        return _uninstall(root,True)
+        from . import resource_systemd, resource_manager
+        reserved=[]
+        try:
+            # Validate every registered unit before reserving any gateway.
+            units=[Path(name) for name in installations.roots() if resource_systemd.verify(Path(name))]
+            for source in units:
+                state=resource_systemd.status(source)
+                if state['status']=='RUNNING':
+                    resource_manager.quiesce(source)
+                    reserved.append(source)
+            return _uninstall(root,True)
+        finally:
+            # Failed/preflight-only maintenance must reopen still-running gateways.
+            # Removed units and restored-but-stopped units require explicit restart.
+            for source in reserved:
+                if resource_systemd.receipt_path(source).exists() and resource_systemd.status(source)['status']=='RUNNING':
+                    resource_manager.resume(source)
 
 
 def child_transactions(identifier):

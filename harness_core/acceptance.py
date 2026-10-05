@@ -2,11 +2,15 @@
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
 from .common import HarnessError, canonical, distribution_path, new_id, now, private_path, read_json, sha, state_dir, write_json
 from .transaction import Transaction
+
+STATIC_TEST_TIMEOUT=600
+EXTERNAL_CHECK_TIMEOUT=120
 
 REQUIRED={'STATIC','RUNTIME','TRIGGER','MCP','HOOKS','REVIEW','RECOVERY','ISOLATION'}
 
@@ -30,16 +34,30 @@ def verify_candidate_runtime(candidate,binding):
         raise HarnessError('Candidate required sidecars are not prepared')
     urls=set()
     if layout:
-        base_urls=sidecars.require_live_binding(candidate)
-        urls.update(base_urls)
+        from . import resource_manager, resource_systemd
+        gateway = resource_manager.descriptor_path(candidate).exists()
+        base_urls=sidecars.require_live_binding(candidate, allow_dormant=True) if gateway else sidecars.require_live_binding(candidate)
+        ports=layout['ports']
+        if gateway:
+            descriptor=resource_manager.load(candidate)
+            if resource_systemd.status(candidate)['status']!='RUNNING':
+                raise HarnessError('Candidate resource gateway is not running')
+            for group in sidecars.GROUPS:
+                current=resource_manager.control(candidate,'status',group)
+                if current.get('state') not in {'DORMANT','RUNNING'} or current.get('active_calls')!=0:
+                    raise HarnessError('Candidate resource gateway is busy or unhealthy')
+            ports=descriptor['ports']
+            urls.update('http://127.0.0.1:'+str(port) for port in ports.values())
+        else:
+            urls.update(base_urls)
         if 'powercontext' in layout['recipes']:
-            urls.add('http://127.0.0.1:'+str(layout['ports']['powercontext'])+'/mcp/')
+            urls.add('http://127.0.0.1:'+str(ports['powercontext'])+'/mcp/')
         from urllib.parse import urlparse
         for value in urls:
             try:
                 parsed=urlparse(value)
                 valid=(parsed.scheme=='http' and parsed.hostname in {'127.0.0.1','localhost'}
-                       and parsed.port in layout['ports'].values() and not parsed.username and not parsed.password
+                       and parsed.port in ports.values() and not parsed.username and not parsed.password
                        and not parsed.query and not parsed.fragment)
             except (ValueError,TypeError):valid=False
             if not valid:
@@ -82,20 +100,33 @@ def runtime_fingerprint(candidate):
     from . import software,sidecars
     return sha(canonical({'software':read_json(software.snapshot_path(candidate),{}),
                           'services':sidecars.layout(candidate),
-                          'binding':read_json(candidate/'services-binding.json',{})}))
+                          'binding':read_json(candidate/'services-binding.json',{}),
+                          'resource_gateway':read_json(candidate/'.harness-install/resources.json',{}),
+                          'resource_unit':read_json(candidate/'.harness-install/resource-unit.json',{})}))
 
 
-def execute(argv,candidate,env,category,timeout=60):
+def execute(argv,candidate,env,category,timeout=60,*,internal_static=False):
     if not isinstance(argv,list) or not argv or not all(isinstance(a,str) for a in argv):
         raise HarnessError('Acceptance checks require a nonempty argv array')
+    expected_static=[sys.executable,'-m','unittest','discover','-s','tests']
+    if internal_static and (category!='STATIC' or argv!=expected_static):
+        raise HarnessError('Internal STATIC budget requires the mandatory test command')
+    budget=STATIC_TEST_TIMEOUT if internal_static else EXTERNAL_CHECK_TIMEOUT
+    try:budget=min(int(timeout),budget)
+    except (ValueError,TypeError,OverflowError):raise HarnessError('Invalid acceptance timeout') from None
+    if budget<=0:raise HarnessError('Acceptance timeout must be positive')
     command=[x.replace('${CANDIDATE}',str(candidate)).replace('${PYTHON}',sys.executable) for x in argv]
     started=now();run_id=new_id('acceptance-run')
     try:
-        process=subprocess.Popen(command,cwd=candidate,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        try:stdout,stderr=process.communicate(timeout=min(int(timeout),120))
-        except subprocess.TimeoutExpired:
-            process.kill();stdout,stderr=process.communicate()
-            raise HarnessError('Candidate process timed out: '+category)
+        process=subprocess.Popen(command,cwd=candidate,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+        try:stdout,stderr=process.communicate(timeout=budget)
+        except BaseException as error:
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            process.communicate()
+            if isinstance(error,subprocess.TimeoutExpired):
+                raise HarnessError('Candidate process timed out: '+category) from None
+            raise
     except OSError as error:
         raise HarnessError('Candidate process unavailable: '+str(error))
     out=stdout.decode(errors='replace');failure=False
@@ -170,7 +201,7 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
     isolated=candidate/'candidate-private';isolated.mkdir(exist_ok=True)
     env=os.environ.copy();env.update(PYTHONDONTWRITEBYTECODE='1',HARNESS_STATE_DIR=str(isolated/'state'),HARNESS_BIN_DIR=str(isolated/'bin'),CODEX_HOME=str(isolated/'codex'),PLANNING_DISABLED='1')
     check=cli.static_check(candidate)
-    tests=execute([sys.executable,'-m','unittest','discover','-s','tests'],candidate,env,'STATIC',120)
+    tests=execute([sys.executable,'-m','unittest','discover','-s','tests'],candidate,env,'STATIC',STATIC_TEST_TIMEOUT,internal_static=True)
     # unittest exits 0 for zero tests: never treat that as acceptance.
     if 'Ran 0 tests' in tests['stderr']:tests['status']='FAIL'
     prior=read_json(state_dir()/'accepted.json',{})

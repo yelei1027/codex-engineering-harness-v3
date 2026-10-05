@@ -13,7 +13,7 @@ services:
       interval: 30s
       timeout: 10s
       start_period: 30s
-    restart: unless-stopped
+    restart: "no"
   screenshot-frontend:
     image: ${HARNESS_SCREENSHOT_FRONTEND_IMAGE:?prepare managed service layout first}
     container_name: ${HARNESS_SERVICE_NAMESPACE:?}-screenshot-frontend
@@ -26,7 +26,7 @@ services:
       interval: 30s
       timeout: 10s
       start_period: 30s
-    restart: unless-stopped
+    restart: "no"
 volumes:
   screenshot-logs:
     name: ${HARNESS_VOLUME_NAMESPACE:?}-screenshot-logs

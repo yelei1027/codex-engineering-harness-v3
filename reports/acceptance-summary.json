@@ -1,30 +1,61 @@
 {
-  "version": "3.1.1",
-  "date": "2026-10-03",
-  "release_hash": "74eb7776c9cdd839ee9796884ff01ae922c4882cf281ad15a68976f693b9e3e5",
-  "status": "PASS_WITH_OPTIONAL_BLOCK",
-  "harness_status": "PASS_WITH_OPTIONAL_BLOCK",
+  "version": "3.3.0",
+  "status": "PASS_WITH_SCOPE_LIMIT",
+  "release_hash": "3a63fc30118c0107ae01f908f5fe3bcab9cb96bf73df7b272db83e3d57472bdb",
   "categories": {
-    "STATIC": {"status": "PASS", "evidence": "harness check + git diff --check"},
-    "CORE_TESTS": {"status": "PASS", "evidence": "66 passed, 4 subtests passed"},
-    "DISABLE_PATH_RESOLUTION": {"status": "PASS", "evidence": "disable accepts any descendant path of an enabled project; non-project parents do not select nested projects"},
-    "RUNTIME": {"status": "PASS", "codex": "0.160.0", "mode": "desktop"},
-    "SKILLS": {"status": "PASS", "evidence": "unchanged from V3.1.0 verified surface"},
-    "MCP": {"status": "PASS", "evidence": "reports/final-mcp-runtime-smoke-3.1.0.json", "components": ["context-mode", "CodeGraph", "MarkItDown", "PowerContext Basic"], "change_scope": "UNCHANGED_IN_3.1.1"},
-    "HOOKS": {"status": "PASS", "evidence": "reports/native-hook-lifecycle-3.1.0.json", "project_handlers": 10, "native_lifecycle": "PASS", "change_scope": "UNCHANGED_IN_3.1.1"},
-    "SUBAGENT": {"status": "PASS_WITH_SCOPE_LIMIT", "change_scope": "UNCHANGED_IN_3.1.1"},
-    "REVIEW": {"status": "PASS_WITH_SCOPE_LIMIT", "change_scope": "UNCHANGED_IN_3.1.1"},
-    "RECOVERY": {"status": "PASS", "evidence": "V3.1.0 native PostCompact RESUME_OK plus Basic PowerContext exact-revision recall; unchanged in 3.1.1"},
-    "ISOLATION": {"status": "PASS", "evidence": "project overlay ownership tests + parent-directory non-selection regression"},
-    "PACKAGE_CLEAN_INSTALL": {"status": "PASS", "evidence": "reports/package-clean-install-3.1.1.json"},
-    "SCREENSHOT_NATIVE_ROUTE": {"status": "PASS_BY_CURRENT_DESKTOP_CAPABILITY"},
-    "SCREENSHOT_TO_CODE_PROVIDER": {"status": "OPTIONAL_NOT_CONFIGURED_FOR_MODEL_GENERATION"},
-    "POWERCONTEXT_FULL_MEMORY": {"status": "OPTIONAL_NOT_CONFIGURED"}
+    "STATIC": {
+      "status": "PASS",
+      "scope": "Current mandatory 281 tests and structure checks"
+    },
+    "HOOKS": {
+      "status": "PASS_WITH_SCOPE_LIMIT",
+      "scope": "Executed distributed-hook regressions; native trust/chat lifecycle UNVERIFIED"
+    },
+    "ISOLATION": {
+      "status": "PASS",
+      "scope": "Current ownership, multi-installation and migration-deferral regressions"
+    },
+    "MCP": {
+      "status": "PASS_WITH_SCOPE_LIMIT",
+      "scope": "Actual PowerContext SDK call and five real installed component calls; Desktop approval UNVERIFIED"
+    },
+    "RECOVERY": {
+      "status": "PASS_WITH_SCOPE_LIMIT",
+      "scope": "Current recovery regressions and separately recorded exact Scope/revision package readback; native recovery UNVERIFIED"
+    },
+    "REVIEW": {
+      "status": "PASS",
+      "scope": "Independent frozen source/docs review, no open P1/P2"
+    },
+    "RUNTIME": {
+      "status": "PASS",
+      "scope": "Current prepared candidate ownership and gateway checks"
+    },
+    "TRIGGER": {
+      "status": "PASS_WITH_SCOPE_LIMIT",
+      "scope": "Current skill policy/mirror identity and workflow regressions; native model routing UNVERIFIED"
+    },
+    "NATIVE_DESKTOP": {
+      "status": "UNVERIFIED",
+      "scope": "Explicitly retained as a known limitation by user; no fabricated approval or patch evidence"
+    },
+    "PROVIDER_TOOL_CHAIN": {
+      "status": "UNVERIFIED",
+      "scope": "Real basic screenshot generation passed; no tool execution observed"
+    }
   },
-  "release_blockers": [],
-  "boundaries": {
-    "patch_scope": "project path resolution and disable CLI usability",
-    "no_full_powercontext_provider": true,
-    "third_party_screenshot_model_generation_not_configured": true
-  }
+  "tests": {
+    "count": 281,
+    "seconds": 133.062
+  },
+  "provider": {
+    "protocol": "Anthropic Messages",
+    "model": "deepseek-v4.1-flash",
+    "real_generation_seconds": 19.527,
+    "status": "PASS",
+    "tool_execution": "UNVERIFIED"
+  },
+  "source_equivalence": "Final business code/templates/tests match measured versioned package; final changes limited to release documentation",
+  "limits": "See known-limitations.md and docs/RELEASE-3.3.0.md; passing command receipts do not certify native Desktop journeys",
+  "distribution_release_hash": "08cbba1b80b65e008b149b3c1221065f39e1daca189cb6294b97ddae61f4a9cf"
 }

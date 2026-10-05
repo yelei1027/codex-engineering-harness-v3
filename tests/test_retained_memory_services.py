@@ -281,4 +281,79 @@ class RetainedMemoryServicesCase(unittest.TestCase):
         self.assertTrue(all(c['State']['Status']=='exited' for c in self.data()['containers'].values()))
 
 
+    def test_single_retained_namespace_stop_preserves_other_database_service(self):
+        self.fixture.public(self.new,'recover-memory','--apply')
+        with patch.dict(os.environ,self.fixture.env):
+            first=memory_services.load(self.old[0]);second=memory_services.load(self.old[1])
+            other=second['namespace']+'-powercontext'
+            before=self.data()['containers'][other]
+            result=memory_services.manage_one(self.old[0],'stop')
+            self.assertEqual(result['container_state'],'exited')
+            self.assertEqual(self.data()['containers'][other],before)
+            result=memory_services.manage_one(self.old[0],'start')
+            self.assertEqual(result['container_state'],'running')
+            self.assertEqual(self.data()['containers'][other],before)
+
+
+    def test_gateway_controls_still_stop_unconverted_legacy_databases(self):
+        from harness_core import resource_manager
+        self.fixture.public(self.new,'recover-memory','--apply')
+        with patch.dict(os.environ,self.fixture.env),patch.object(resource_manager,'control',return_value={'state':'DORMANT','active_calls':0}):
+            result=resource_manager.manage(self.new,'stop','powercontext')
+            self.assertEqual(len(result['legacy_memory_services']),2)
+            for doc in memory_services.deployments():
+                self.assertEqual(memory_services.inspect(doc)['State']['Status'],'exited')
+
+    def test_gateway_legacy_port_conflict_preflights_before_any_start(self):
+        from harness_core import resource_manager
+        from harness_core.common import HarnessError
+        self.fixture.public(self.new,'recover-memory','--apply')
+        with patch.dict(os.environ,self.fixture.env):
+            memory_services.manage('stop');doc=memory_services.deployments()[-1]
+            with socket.socket() as occupant,patch.object(resource_manager,'control') as control:
+                occupant.bind(('127.0.0.1',doc['port']));occupant.listen()
+                with self.assertRaises(HarnessError):resource_manager.manage(self.new,'start','powercontext')
+                control.assert_not_called()
+
+    def test_on_demand_recovery_prepares_two_databases_without_starting_them(self):
+        from harness_core import resource_manager
+        marker=self.new/'.harness-install/resources.json';marker.parent.mkdir(exist_ok=True);marker.write_text('{}')
+        gateway={'ports':{'powercontext':51001,'screenshot-backend':51002,'screenshot-frontend':51003},
+                 'discovery':{'results':{'initialize':{},'tools/list':{'tools':[]}}}}
+        before=sum(a[0]=='compose' and 'up' in a for a in self.data()['calls'])
+        with patch.dict(os.environ,self.fixture.env),patch.object(resource_manager,'load',return_value=gateway):
+            result=memory_services.restore(self.new,True)
+            self.assertEqual(result['status'],'MEMORY_SERVICES_PREPARED')
+            docs=memory_services.deployments()
+            self.assertEqual(len(docs),2)
+            for doc in docs:
+                self.assertTrue(doc['on_demand'])
+                self.assertNotEqual(doc['port'],doc['backend_port'])
+                self.assertIsNone(memory_services.inspect(doc))
+                self.assertEqual(memory_services.binding(doc['origin_root'],doc['url'])['data_namespace'],doc['data_namespace'])
+        self.assertEqual(sum(a[0]=='compose' and 'up' in a for a in self.data()['calls']),before)
+
+
+    def test_legacy_recovery_conversion_refuses_running_then_preserves_original_binding(self):
+        from harness_core import resource_manager
+        from harness_core.common import HarnessError
+        self.fixture.public(self.new,'recover-memory','--apply')
+        marker=self.new/'.harness-install/resources.json';marker.write_text('{}')
+        gateway={'ports':{'powercontext':51001,'screenshot-backend':51002,'screenshot-frontend':51003},
+                 'discovery':{'results':{'initialize':{},'tools/list':{'tools':[]}}}}
+        before=self.data()
+        with patch.dict(os.environ,self.fixture.env),patch.object(resource_manager,'load',return_value=gateway):
+            with self.assertRaises(HarnessError):memory_services.restore(self.new,True)
+            self.assertEqual(self.data()['containers'],before['containers'])
+            memory_services.manage('stop')
+            old=[memory_services.load(origin) for origin in self.old]
+            memory_services.restore(self.new,True)
+            for previous in old:
+                current=memory_services.load(previous['origin_root'])
+                self.assertTrue(current['on_demand'])
+                for field in ('url','port','data_namespace','image_id'):self.assertEqual(current[field],previous[field])
+                self.assertIsNone(memory_services.inspect(current))
+        self.assertEqual(self.data()['volumes'],before['volumes'])
+
+
 def recovery_source_namespace(origin):return memory_services.source(origin)[2]['data_namespace']

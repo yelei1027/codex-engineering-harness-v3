@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Standalone entry point: safe before executing any downloaded code.
-python3 - "${1:-v3.2.0}" <<'PY'
+python3 - "${1:-v3.3.0}" <<'PY'
 import fcntl, hashlib, json, os, re, shutil, subprocess, sys, tarfile, tempfile
 from pathlib import Path, PurePosixPath
 

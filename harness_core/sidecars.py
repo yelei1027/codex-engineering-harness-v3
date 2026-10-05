@@ -139,20 +139,21 @@ def inspect_volumes(root,group):
             raise HarnessError('Unknown data volume ownership; preserve: '+name)
 
 
-def require_live_binding(root):
-    """Verify each bound endpoint belongs to its running owned service."""
+def require_live_binding(root, *, allow_dormant=False):
+    """Verify owned resources; dormant mode still requires full containers and volumes."""
     value=layout(root)
     if not value:raise HarnessError('Candidate service ownership is not prepared')
     urls=set()
     for group in value['recipes']:
         containers=inspect_owned(root,group)
-        if len(containers)!=len(GROUPS[group]) or any(v['state']!='running' for v in containers):
+        allowed_states={'running','exited'} if allow_dormant else {'running'}
+        if len(containers)!=len(GROUPS[group]) or any(v['state'] not in allowed_states for v in containers):
             raise HarnessError('Candidate owned services are missing or not running')
         inspect_volumes(root,group)
         for suffix in VOLUMES[group]:
             if docker(['volume','inspect',value['data_namespace']+'-'+suffix],allow_missing=True) is None:
                 raise HarnessError('Candidate owned data volume is missing')
-        urls.update(verify_container_specs(root,group,require_running=True))
+        urls.update(verify_container_specs(root,group,require_running=not allow_dormant))
     return urls
 
 def verify_container_specs(root,group,require_running=False):
@@ -339,6 +340,9 @@ def write_binding(root):
             binding['component_commands']['powercontext']=[str(Path(root)/'runtimes/powercontext/client-venv/bin/powercontext'),'doctor','--server-url',url,'--json']
         else:
             binding['service_urls'].update(screenshot_backend=urls['screenshot-backend'],screenshot_frontend=urls['screenshot-frontend'])
+    from . import resource_manager
+    if resource_manager.descriptor_path(root).exists():
+        binding=resource_manager.public_binding(root, binding)
     write_json(Path(root)/'services-binding.json',binding)
     return binding
 

@@ -45,6 +45,7 @@ class MemoryServicePinCase(unittest.TestCase):
                 from harness_core.common import write_json
                 write_json(sidecars.layout_path(root),owned)
             (root/'services-binding.json').write_text(json.dumps({'service_urls':{'powercontext':f'http://127.0.0.1:{server.server_port}'}}))
+        (self.old/'harness.lock').write_text('{}\n')
         self.fixture.public(self.old,'install');self.fixture.public(self.old,'prepare',self.fixture.repo,'--apply','--profile','L1')
         self.url=f'http://127.0.0.1:{self.servers[0].server_port}'
         with patch.dict(os.environ,self.fixture.env):namespace=sidecars.layout(self.old)['data_namespace']
@@ -113,3 +114,30 @@ class MemoryServicePinCase(unittest.TestCase):
         _,plan=self.fixture.public(self.new,'migrate',self.fixture.repo,'--from',self.old)
         self.assertEqual(plan['memory']['service_root'],str(self.old));self.assertEqual(self.calls,[])
         self.assertEqual(self.bound.read_bytes(),before)
+
+
+    def test_public_migration_preserves_verified_old_gateway_endpoint(self):
+        import socket
+        from harness_core import resource_manager
+        from harness_core.resource_mcp import discovery_snapshot
+        from harness_core.common import write_json
+        with patch.dict(os.environ,self.fixture.env):
+            layout=sidecars.layout(self.old)
+            sockets=[]
+            try:
+                ports={}
+                for name in sidecars.PORT_KEYS:
+                    sock=socket.socket();sock.bind(('127.0.0.1',0));sockets.append(sock);ports[name]=sock.getsockname()[1]
+                layout['ports']['powercontext']=ports['powercontext']
+                write_json(sidecars.layout_path(self.old),layout)
+                identity=resource_manager.component_identity(self.old)
+                ports['powercontext']=self.servers[0].server_port
+                write_json(resource_manager.descriptor_path(self.old),{'schema_version':1,'root':str(self.old),'identity':identity,'ports':ports,'control_token':'a'*64,'discovery':discovery_snapshot(identity,{'initialize':{}})})
+            finally:
+                for sock in sockets:sock.close()
+        before=self.bound.read_bytes()
+        self.fixture.public(self.new,'migrate',self.fixture.repo,'--from',self.old,'--apply')
+        _,result=self.fixture.public(self.new,'context','recall',self.fixture.repo,'--task','retained')
+        self.assertEqual(result['status'],'RECALLED')
+        self.assertEqual(self.bound.read_bytes(),before)
+        self.assertEqual({call[0] for call in self.calls},{'old'})

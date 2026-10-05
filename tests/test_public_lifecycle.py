@@ -414,21 +414,31 @@ if os.environ.get('FIXTURE_BOOTSTRAP_FAIL'): sys.exit(9)
         ports={'8000/tcp':[{'HostIp':'127.0.0.1','HostPort':'28080'}]}
         valid={'State':{'Running':True},'HostConfig':{'PortBindings':ports},'NetworkSettings':{'Ports':ports},
                'Mounts':[{'Type':'volume','Name':'owned-data-powercontext-data','Destination':'/data'}]}
-        for problem in ['missing_container','missing_volume','wrong_port','wrong_mount','extra_port','extra_mount','readonly_mount']:
-            with self.subTest(problem=problem):
-                info=copy.deepcopy(valid)
-                if problem=='wrong_port':info['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort']='29090'
-                if problem=='wrong_mount':info['Mounts'][0]['Name']='another-root-volume'
-                if problem=='extra_port':
-                    for section,key in [('HostConfig','PortBindings'),('NetworkSettings','Ports')]:
-                        info[section][key]['9000/tcp']=[{'HostIp':'0.0.0.0','HostPort':'29090'}]
-                if problem=='extra_mount':info['Mounts'].append({'Type':'bind','Source':'/external-user-data','Destination':'/extra'})
-                if problem=='readonly_mount':info['Mounts'][0]['RW']=False
-                def docker(argv,**kwargs):
-                    if argv[0]=='volume':return None if problem=='missing_volume'else'[{}]'
-                    return json.dumps([info])
-                with patch.object(sidecars,'layout',return_value=layout),patch.object(sidecars,'inspect_owned',return_value=[]if problem=='missing_container'else[{'state':'running'}]),patch.object(sidecars,'inspect_volumes'),patch.object(sidecars,'compose',return_value=json.dumps(resolved)),patch.object(sidecars,'docker',side_effect=docker):
-                    with self.assertRaises(HarnessError):sidecars.require_live_binding(self.base)
+        for dormant in (False,True):
+            for problem in ['valid_dormant','missing_container','missing_volume','wrong_port','wrong_mount','extra_port','extra_mount','readonly_mount']:
+                with self.subTest(problem=problem):
+                    info=copy.deepcopy(valid)
+                    if problem=='wrong_port':info['HostConfig']['PortBindings']['8000/tcp'][0]['HostPort']='29090'
+                    if problem=='wrong_mount':info['Mounts'][0]['Name']='another-root-volume'
+                    if problem=='extra_port':
+                        for section,key in [('HostConfig','PortBindings'),('NetworkSettings','Ports')]:
+                            info[section][key]['9000/tcp']=[{'HostIp':'0.0.0.0','HostPort':'29090'}]
+                    if problem=='extra_mount':info['Mounts'].append({'Type':'bind','Source':'/external-user-data','Destination':'/extra'})
+                    if problem=='readonly_mount':info['Mounts'][0]['RW']=False
+                    info['State']['Running']=not dormant
+                    if dormant:info['NetworkSettings']['Ports']={}
+                    def docker(argv,**kwargs):
+                        if argv[0]=='volume':return None if problem=='missing_volume'else'[{}]'
+                        return json.dumps([info])
+                    with patch.object(sidecars,'layout',return_value=layout),patch.object(sidecars,'inspect_owned',return_value=[]if problem=='missing_container'else[{'state':'exited' if dormant else 'running'}]),patch.object(sidecars,'inspect_volumes'),patch.object(sidecars,'compose',return_value=json.dumps(resolved)),patch.object(sidecars,'docker',side_effect=docker):
+                        if problem=='valid_dormant' and not dormant:
+                            self.assertEqual(sidecars.require_live_binding(self.base),{'http://127.0.0.1:28080'})
+                        else:
+                            with self.assertRaises(HarnessError):sidecars.require_live_binding(self.base)
+                        if problem=='valid_dormant':
+                            self.assertEqual(sidecars.require_live_binding(self.base,allow_dormant=True),{'http://127.0.0.1:28080'})
+                        else:
+                            with self.assertRaises(HarnessError):sidecars.require_live_binding(self.base,allow_dormant=True)
 
     def test_promotion_rejects_orphan_pending_and_unrecovered_package_journals(self):
         old=self.release('old');source=self.release('new')

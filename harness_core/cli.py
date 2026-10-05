@@ -784,6 +784,8 @@ def main():
     p.add_argument('repo');p.add_argument('--server',required=True)
     p=subs.add_parser('processes',help='受管组件进程状态；停止只处理本安装已登记的实例')
     p.add_argument('action',choices=['status','stop'])
+    p=subs.add_parser('resources',help='查看按需资源、活动调用及空闲回收状态')
+    p.add_argument('action',choices=['status','gc']);p.add_argument('--apply',action='store_true')
     p=subs.add_parser('services',help='统一管理本安装的受管服务；停止保留数据卷')
     p.add_argument('action',choices=['status','start','stop']);p.add_argument('--service',choices=['all','powercontext','screenshot-to-code'],default='all')
     p=subs.add_parser('recover-data',help='重装后预览/恢复保留的任务和记忆数据；不恢复旧程序或信任')
@@ -874,10 +876,23 @@ def main():
             if args.apply:
                 with lock(state_dir()/'operation.lock'):result=memory_services.restore(ROOT,True,args.origin_root)
             else:result=memory_services.restore(ROOT,origin=args.origin_root)
+        elif command=='resources':
+            from . import resource_manager
+            if args.action=='gc':
+                from . import resource_gc
+                result=resource_gc.collect(args.apply)
+            elif args.apply:raise HarnessError('--apply is only valid for resources gc')
+            else:result=resource_manager.status(ROOT)
         elif command=='services':
             from . import sidecars
             from . import memory_services
-            if args.action=='status':
+            from . import resource_manager
+            if resource_manager.descriptor_path(ROOT).exists():
+                if args.action=='status':result=resource_manager.manage(ROOT,args.action,args.service)
+                else:
+                    with lock(state_dir()/'operation.lock'):
+                        result=resource_manager.manage(ROOT,args.action,args.service)
+            elif args.action=='status':
                 result=sidecars.manage(ROOT,args.action,args.service)
                 if args.service!='screenshot-to-code':result['retained_memory_services']=memory_services.manage(args.action)
             else:
@@ -923,7 +938,7 @@ def main():
             elif args.task_command=='resume':result=workflow.resume(repo,args.id)
             else:result=workflow.load(workflow.task_path(repo,args.id))
         output(result)
-        if result.get('status') in {'FAIL','RESUME_CONFLICT','UNSYNCED','PREFLIGHT_BLOCKED'}:sys.exit(1)
+        if result.get('status') in {'FAIL','RESUME_CONFLICT','UNSYNCED','PREFLIGHT_BLOCKED','PARTIAL_RESOURCE_OPERATION','RESOURCE_OPERATION_FAILED'}:sys.exit(1)
     except (HarnessError,OSError,ValueError,subprocess.TimeoutExpired) as error:
         if args.command=='mcp-run':print(str(error),file=sys.stderr,flush=True)
         else:output({'status':'ERROR','error':str(error)})

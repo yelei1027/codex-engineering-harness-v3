@@ -2,7 +2,9 @@
 
 给 Codex Desktop 使用的项目开发流程：先理解需求、确认范围，再实现、验证和交付。
 
-当前发行版：[v3.2.0](https://github.com/yelei1027/codex-engineering-harness-v3/releases/tag/v3.2.0)。支持与验证环境为 **Linux x86_64 + Bash + Codex Desktop**。本说明不提供 Windows PowerShell/CMD 安装方案；WSL 也未作为独立支持环境完成验收。
+当前发行版：[v3.3.0](https://github.com/yelei1027/codex-engineering-harness-v3/releases/tag/v3.3.0)。支持与验证环境为 **Linux x86_64 + Bash + Codex Desktop**。本说明不提供 Windows PowerShell/CMD 安装方案；WSL 也未作为独立支持环境完成验收。
+
+按需服务、空闲回收及第三方模型配置见 [v3.3 资源管理说明](docs/RESOURCE-MANAGEMENT-3.3.md)。原生 Desktop 未验证项保留为已知限制，见发行说明。
 
 ## 先分清三个操作位置
 
@@ -27,15 +29,15 @@ gh auth status
 
 预期：第二条命令显示登录成功且账号可访问仓库。然后下载安装脚本到独立临时目录并运行指定版本：
 
-**位置：同一个 Linux Bash 终端。用途：首次安装 v3.2.0。**
+**位置：同一个 Linux Bash 终端。用途：首次安装 v3.3.0。**
 
 ```bash
 harness_download_dir="$(mktemp -d)"
-gh release download v3.2.0 --repo yelei1027/codex-engineering-harness-v3 --pattern install-release.sh --dir "$harness_download_dir"
-bash "$harness_download_dir/install-release.sh" v3.2.0
+gh release download v3.3.0 --repo yelei1027/codex-engineering-harness-v3 --pattern install-release.sh --dir "$harness_download_dir"
+bash "$harness_download_dir/install-release.sh" v3.3.0
 ```
 
-预期：下载发行包、核对 SHA256、准备锁定组件、启动受管服务并登记 `harness`。默认安装到 `~/.local/share/codex-engineering-harness/releases/3.2.0`。**安装组件不等于项目已接入，也不等于 Hook 已信任。**
+预期：下载发行包、核对 SHA256、准备锁定组件、准备受管服务、完成发现后休眠并登记 `harness`。默认安装到 `~/.local/share/codex-engineering-harness/releases/3.3.0`。**安装组件不等于项目已接入，也不等于 Hook 已信任。**
 
 **位置：终端 · Bash，任意目录。用途：让当前终端找到入口，并检查安装。**
 
@@ -108,16 +110,16 @@ harness prepare "/你的项目路径" --apply
 **推荐位置：客户端 · 聊天框。让 Agent 根据你的实际安装路径操作：**
 
 ```text
-请把已安装的 Harness 更新到 v3.2.0。先只读核对当前版本、安装根和项目绑定，展示候选更新与项目迁移范围；确认后再执行。保留任务、记忆和无关配置，不直接覆盖旧安装。
+请把已安装的 Harness 更新到 v3.3.0。先只读核对当前版本、安装根和项目绑定，展示候选更新与项目迁移范围；确认后再执行。保留任务、记忆和无关配置，不直接覆盖旧安装。
 ```
 
 手动维护者在 **Linux 终端 · Bash** 先运行 `harness update --help`，再按 [详细维护说明](INSTALLATION.md#更新与项目迁移) 操作。`--to` 必须指向真实的新版本来源目录；`--acceptance-plan` 需要实际验收命令，不能填造假的通过结果。已有任务结束后才能按适用范围迁移项目。
 
 ## 6. 下载与深入说明
 
-- [v3.2.0 下载页](https://github.com/yelei1027/codex-engineering-harness-v3/releases/tag/v3.2.0)：下载 `codex-engineering-harness-3.2.0-linux-x86_64.tar.gz` 及同名 `.sha256`；GitHub 自动生成的 Source code 压缩包不是完整发行安装包。
+- [v3.3.0 下载页](https://github.com/yelei1027/codex-engineering-harness-v3/releases/tag/v3.3.0)：下载 `codex-engineering-harness-3.3.0-linux-x86_64.tar.gz` 及同名 `.sha256`；GitHub 自动生成的 Source code 压缩包不是完整发行安装包。
 - [详细安装、更新、恢复说明](INSTALLATION.md)：维护命令、前提与边界。
-- [发行说明与已知限制](docs/RELEASE-3.2.0.md)：实际验证范围及尚未验证项。
+- [发行说明与已知限制](docs/RELEASE-3.3.0.md)：实际验证范围及尚未验证项。
 - [完整流程 HTML](docs/codex_engineering_harness_v3_parallel_flow.html)：下载后在浏览器打开；它是说明书，不是命令执行器。
 
 当前发行不自动替换你的本机安装。原生补丁拒写原始返回不可获取等限制仍保留；正式发布不代表完整 PRD 的所有原生验收已通过。

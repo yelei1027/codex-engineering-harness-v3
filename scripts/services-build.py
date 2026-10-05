@@ -4,6 +4,8 @@ import argparse
 import os
 import subprocess
 import json
+import shutil
+import tempfile
 from services_common import ROOT, PINS, prepare_runtime, verify_source
 import sys
 sys.path.insert(0,str(ROOT))
@@ -43,7 +45,21 @@ with lock(ROOT/'.harness-install/services.lock'):
         else:
             for component in ['backend','frontend']:
                 preparation.record(ROOT,'SCREENSHOT_'+component.upper())
-                subprocess.run(['docker','build','-f',str(ROOT/'runtimes'/name/f'Dockerfile.{component}'),'-t',images['screenshot-'+component],str(source)],check=True)
+                with tempfile.TemporaryDirectory(prefix='harness-image-context-') as temporary:
+                    context = source
+                    if component == 'frontend':
+                        # Legacy Docker supports this isolated context too; no buildx required.
+                        from pathlib import Path
+                        context = Path(temporary)
+                        shutil.copytree(source/'frontend', context/'frontend', symlinks=True)
+                        shutil.copyfile(ROOT/'runtimes'/name/'frontend-server.mjs', context/'harness-frontend-server.mjs')
+                    else:
+                        from pathlib import Path
+                        context = Path(temporary)
+                        shutil.copytree(source/'backend', context/'backend', symlinks=True,
+                                        ignore=shutil.ignore_patterns('.env', '__pycache__', '.venv'))
+                        shutil.copyfile(ROOT/'runtimes'/name/'harness_provider.py', context/'harness_provider.py')
+                    subprocess.run(['docker','build','-f',str(ROOT/'runtimes'/name/f'Dockerfile.{component}'),'-t',images['screenshot-'+component],str(context)],check=True)
                 sidecars.record_image(ROOT,'screenshot-'+component)
         sidecars.record_images(ROOT,name)
         sidecars.record_build(ROOT,name)

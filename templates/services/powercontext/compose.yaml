@@ -7,7 +7,7 @@ services:
       - "127.0.0.1:${POWERCONTEXT_PORT:-18080}:8000"
     volumes:
       - powercontext-data:/data
-    restart: unless-stopped
+    restart: "no"
 volumes:
   powercontext-data:
     name: ${HARNESS_VOLUME_NAMESPACE:?}-powercontext-data

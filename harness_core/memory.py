@@ -78,6 +78,10 @@ def binding_plan(repo,source_root=None):
     if selected!=Path(cli.ROOT):
         if not deployment:raise HarnessError('Original memory service has no verified resource ownership; preserve binding')
         port=recovered['port'] if recovered else deployment['ports']['powercontext']
+        if not recovered:
+            from . import resource_manager
+            if resource_manager.descriptor_path(selected).exists():
+                port=resource_manager.load(selected)['ports']['powercontext']
         if previous['url']!='http://127.0.0.1:'+str(port):
             raise HarnessError('Original memory endpoint differs from the owned service port; preserve binding')
     return {'status':'MEMORY_RECOVERED_SERVICE' if recovered else 'MEMORY_PINNED_TO_ORIGINAL_SERVICE' if selected!=Path(cli.ROOT) else 'MEMORY_CURRENT_SERVICE',

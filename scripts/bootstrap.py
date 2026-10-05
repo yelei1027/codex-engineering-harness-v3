@@ -95,7 +95,13 @@ def prepare(a):
         if not service_binding.exists():
             raise SystemExit('Started services did not generate this machine\'s services-binding.json.')
         software.capture(ROOT,['runtimes/powercontext','runtimes/screenshot-to-code'])
-        extra = json.loads(service_binding.read_text())
+        from harness_core import resource_manager, resource_systemd, sidecars
+        resource_manager.prepare(ROOT)
+        sidecars.manage(ROOT, 'stop')
+        resource_systemd.install(ROOT)
+        extra = resource_manager.public_binding(ROOT)
+        from harness_core.common import write_json
+        write_json(service_binding, extra)
         binding['mcp_servers'].update(extra.get('mcp_servers', {}))
         binding['component_commands'].update(extra.get('component_commands', {}))
         (ROOT/'machine-binding.json').write_text(json.dumps(binding, indent=2)+'\n')

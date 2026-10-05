@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import sys
 import unittest
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import test_public_lifecycle as fixtures
@@ -67,6 +69,25 @@ class PartialServiceRetryCase(unittest.TestCase):
         self.root=self.fixture.release();self.store=self.fixture.base/'docker.json'
         self.store.write_text(json.dumps({'images':{},'volumes':{},'containers':{},'calls':[],'failed_once':False}))
         self.fixture.env['PARTIAL_DOCKER_STATE']=str(self.store)
+        self.fixture.env['XDG_CONFIG_HOME']=str(self.fixture.base/'config')
+        (self.root/'harness.lock').write_text('{}\n')
+        self.fixture.executable(self.fixture.tools/'node', r'''#!/usr/bin/env python3
+import json,sys
+if sys.argv[1:]==['--version']:print('v24.0.0')
+else:
+ request=json.load(sys.stdin)
+ assert request['operation']=='discovery'
+ print(json.dumps({'initialize':{'protocolVersion':'2025-11-25','capabilities':{'tools':{}},'serverInfo':{'name':'fixture','version':'1'}},'tools/list':{'tools':[]}}))
+''')
+        self.fixture.executable(self.fixture.tools/'systemctl', r'''#!/usr/bin/env python3
+import os,sys
+from pathlib import Path
+if 'is-active' in sys.argv:print('active')
+if 'show' in sys.argv:
+ unit=sys.argv[sys.argv.index('show')+1]
+ print('ActiveState=active\nSubState=running\nMainPID=0\nMemoryCurrent=0\nFragmentPath='+str(Path(os.environ['XDG_CONFIG_HOME'])/'systemd/user'/unit))
+''')
+
         self.fixture.executable(self.fixture.tools/'docker',DOCKER)
         self.fixture.executable(self.fixture.tools/'npm','#!/bin/sh\nif [ "$1" != --version ]; then mkdir -p node_modules; echo owned > node_modules/fixture; fi\n')
         self.fixture.executable(self.fixture.tools/'uv',r'''#!/usr/bin/env python3
@@ -84,6 +105,12 @@ if a[0]=='sync':p=Path(os.environ['UV_PROJECT_ENVIRONMENT'])/'bin/powercontext';
         for name,pin in [('powercontext','6b2f6e8a4c1aac59fca75662aca26d78748bfa29'),('screenshot-to-code','d026163f586dfa8c5c10d28c36edd59a9d3b0e88')]:
             source=self.root/'vendor'/name;source.mkdir();(source/'fixture.txt').write_text('accepted fault-fixture source')
             trees[name]={'commit':pin,'files':{'fixture.txt':{'kind':'file','sha256':hashlib.sha256((source/'fixture.txt').read_bytes()).hexdigest()}}}
+        frontend=self.root/'vendor/screenshot-to-code/frontend'
+        frontend.mkdir();(frontend/'fixture.txt').write_text('accepted frontend source')
+        trees['screenshot-to-code']['files']['frontend/fixture.txt']={'kind':'file','sha256':hashlib.sha256((frontend/'fixture.txt').read_bytes()).hexdigest()}
+        backend=self.root/'vendor/screenshot-to-code/backend'
+        backend.mkdir();(backend/'fixture.txt').write_text('accepted backend source')
+        trees['screenshot-to-code']['files']['backend/fixture.txt']={'kind':'file','sha256':hashlib.sha256((backend/'fixture.txt').read_bytes()).hexdigest()}
         (self.root/'manifests/source-trees.json').write_text(json.dumps(trees))
 
     def data(self):return json.loads(self.store.read_text())
@@ -93,6 +120,17 @@ if a[0]=='sync':p=Path(os.environ['UV_PROJECT_ENVIRONMENT'])/'bin/powercontext';
         self.assertNotEqual(result.returncode,0);self.assertIn('服务启动',reply['error'])
         d=self.data();self.assertEqual(len(d['containers']),1)
         self.assertFalse((self.fixture.state/'accepted.json').exists())
+        # Real loopback readiness fixture; Docker/systemd/SDK remain declared fakes.
+        port=json.loads((self.root/'.harness-install/services.json').read_text())['ports']['powercontext']
+        class Ready(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_GET(self):
+                payload=b'{"status":"ready"}'
+                self.send_response(200);self.send_header('Content-Length',str(len(payload)))
+                self.end_headers();self.wfile.write(payload)
+        server=ThreadingHTTPServer(('127.0.0.1',port),Ready)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        self.addCleanup(server.server_close);self.addCleanup(server.shutdown)
         return d
 
     def test_public_retry_resumes_partial_start_without_rebuilding_or_losing_data(self):
@@ -111,7 +149,8 @@ if a[0]=='sync':p=Path(os.environ['UV_PROJECT_ENVIRONMENT'])/'bin/powercontext';
         before=self.failed_start();self.fixture.public(self.root,'services','stop')
         self.assertEqual(next(iter(self.data()['containers'].values()))['State']['Status'],'exited')
         self.fixture.public(self.root,'install','--prepare')
-        self.assertTrue(all(v['State']['Status']=='running' for v in self.data()['containers'].values()))
+        self.assertTrue(all(v['State']['Status']=='exited' for v in self.data()['containers'].values()))
+        self.assertTrue((self.root/'.harness-install/resources.json').is_file())
         self.assertEqual(self.data()['images'],before['images'])
 
     def test_changed_build_or_foreign_consumer_blocks_before_any_start_or_rebuild(self):
@@ -139,3 +178,12 @@ if a[0]=='sync':p=Path(os.environ['UV_PROJECT_ENVIRONMENT'])/'bin/powercontext';
                 after=case.data();case.assertEqual(after['containers'],before['containers']);case.assertEqual(after['volumes'],before['volumes'])
                 case.assertFalse(any(a[0]=='build' or (a[0]=='compose' and any(x in a for x in ['up','down'])) for a in after['calls'][offset:]))
                 case.assertFalse((case.fixture.state/'accepted.json').exists())
+
+    def test_backend_restart_preserves_public_gateway_addresses(self):
+        self.failed_start();self.fixture.public(self.root,'install','--prepare')
+        binding=self.root/'services-binding.json';before=binding.read_bytes()
+        result=subprocess.run([sys.executable,str(self.root/'scripts/services.py'),'start','--service','powercontext'],env=self.fixture.env,capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(binding.read_bytes(),before)
+        saved=json.loads(before);gateway=json.loads((self.root/'.harness-install/resources.json').read_text())
+        self.assertEqual(saved['mcp_servers']['powercontext']['url'],f"http://127.0.0.1:{gateway['ports']['powercontext']}/mcp/")

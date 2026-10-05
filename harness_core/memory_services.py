@@ -65,10 +65,28 @@ def source(origin):
     return origin,retained,old
 
 
+def original_port(original):
+    root,retained,old=original
+    recovery_doc=recovery.regular_json(retained/'recovery.json',{})
+    uninstall=recovery.regular_json(state_dir()/'uninstalls'/(safe_id(recovery_doc['uninstall_id'])+'.json'),{})
+    item=next((v for v in uninstall.get('plan',{}).get('installations',[]) if v['root']==str(root)),None)
+    if not item:raise HarnessError('Original memory endpoint has no uninstall provenance')
+    port=item.get('public_service_ports',old['ports']).get('powercontext')
+    if type(port) is not int or not 1024<=port<=65535:raise HarnessError('Invalid original public memory port')
+    return port
+
+
+def backend_port(doc):
+    port=doc.get('backend_port',doc['port'])
+    if type(port) is not int or not 1024<=port<=65535:raise HarnessError('Invalid memory backend port')
+    if 'backend_port' in doc and port==doc['port']:raise HarnessError('Memory gateway overlaps backend port')
+    return port
+
+
 def env(doc):
     return {**os.environ,'HARNESS_SERVICE_NAMESPACE':doc['namespace'],
             'HARNESS_VOLUME_NAMESPACE':doc['data_namespace'],'HARNESS_STATE_ID':doc['state_id'],
-            'POWERCONTEXT_PORT':str(doc['port']),'HARNESS_POWERCONTEXT_IMAGE':doc['image_id']}
+            'POWERCONTEXT_PORT':str(backend_port(doc)),'HARNESS_POWERCONTEXT_IMAGE':doc['image_id']}
 
 
 def inspect(doc):
@@ -100,7 +118,7 @@ def resources(doc,require_absent=False):
         mounts=container.get('Mounts',[])
         if not any(m.get('Name')==volume and m.get('Destination')=='/data' for m in mounts):
             raise HarnessError('Recovered memory container uses another database; preserve')
-        expected_ports=[{'HostIp':'127.0.0.1','HostPort':str(doc['port'])}]
+        expected_ports=[{'HostIp':'127.0.0.1','HostPort':str(backend_port(doc))}]
         configured=container.get('HostConfig',{}).get('PortBindings',{}).get('8000/tcp') or []
         if configured!=expected_ports:
             raise HarnessError('Recovered memory endpoint differs; preserve')
@@ -129,7 +147,7 @@ def binding(origin,url,namespace=None):
     original=source(origin)
     verify_origin(doc,original)
     container=inspect(doc)
-    if not container or container.get('State',{}).get('Status')!='running':
+    if not doc.get('on_demand') and (not container or container.get('State',{}).get('Status')!='running'):
         raise HarnessError('Recovered memory container is not running; preserve binding and start its owned service')
     return doc
 
@@ -137,11 +155,14 @@ def binding(origin,url,namespace=None):
 def verify_origin(doc,original):
     if not original:raise HarnessError('Recovered memory has no committed original deployment')
     root,retained,old=original
+    backend_port(doc)
+    if doc.get('on_demand') and ('backend_port' not in doc or type(doc.get('manual')) is not bool or not isinstance(doc.get('discovery'),dict)):
+        raise HarnessError('Incomplete retained memory gateway metadata')
     descriptor=recovery.regular_json(retained/'recovery.json',{})
     if (doc['data_namespace']!=old['data_namespace'] or doc['state_id']!=old['state_id']
             or doc['retained_path']!=str(retained) or doc['uninstall_id']!=descriptor.get('uninstall_id')
             or doc['image_id']!=old['image_ids']['powercontext']
-            or doc['port']!=old['ports']['powercontext'] or doc['url']!='http://127.0.0.1:'+str(doc['port'])
+            or doc['port']!=original_port(original) or doc['url']!='http://127.0.0.1:'+str(doc['port'])
             or doc['namespace']!='codex-harness-memory-'+sidecars.root_id(root)):
         raise HarnessError('Recovered memory provenance differs from the original resource plan; preserve')
 
@@ -153,6 +174,19 @@ def free_port(port):
         sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         try:sock.bind(('127.0.0.1',port));sock.listen(1)
         except OSError as error:raise HarnessError('Original memory port '+str(port)+' is occupied; preserve original URL and reconcile') from error
+
+
+def on_demand_document(doc,root,current,planned):
+    from . import resource_manager
+    gateway=resource_manager.load(root)
+    blocked={doc['port'],*current['ports'].values(),*gateway['ports'].values(),
+             *[backend_port(item) for item in planned]}
+    while True:
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1',0));selected=sock.getsockname()[1]
+        if selected not in blocked:break
+    return {**doc,'owner_root':str(root),'backend_port':selected,'on_demand':True,'manual':False,
+            'discovery':gateway['discovery']['results']}
 
 
 def plan(root,origin=None):
@@ -179,7 +213,17 @@ def plan(root,origin=None):
         if previous and previous['status']=='PREPARED':
             verify_origin(previous,original)
             container=inspect(previous)
-            if not container or container.get('State',{}).get('Status')!='running':free_port(previous['port'])
+            from . import resource_manager
+            conversion=resource_manager.descriptor_path(root).exists() and (not previous.get('on_demand') or previous.get('owner_root')!=str(root))
+            if conversion:
+                if container and container.get('State',{}).get('Status')=='running':
+                    raise HarnessError('Stop the original retained service before converting its resource mode')
+                free_port(previous['port'])
+                converted=on_demand_document(previous,root,current,result)
+                converted['compose_image']={**image(recipe),'mode':0o600}
+                converted['transition_from_hash']=sha(canonical(previous))
+                result.append(converted);continue
+            if not container or container.get('State',{}).get('Status')!='running':free_port(backend_port(previous))
             result.append(previous);continue
         if previous:
             verify_origin(previous,original)
@@ -190,7 +234,7 @@ def plan(root,origin=None):
         elif base.exists():raise HarnessError('Unowned memory recovery destination; preserve')
         safe_parent(provider)
         if provider.is_symlink() or not provider.is_file():raise HarnessError('Retained provider environment is missing; preserve')
-        port=old['ports']['powercontext']
+        port=original_port(original)
         free_port(port)
         volume=old['data_namespace']+'-powercontext-data';raw=sidecars.docker(['volume','inspect',volume],allow_missing=True)
         if raw is None:raise HarnessError('Retained memory volume is missing; preserve binding')
@@ -202,6 +246,9 @@ def plan(root,origin=None):
              'data_namespace':old['data_namespace'],'state_id':old['state_id'],'port':port,'url':'http://127.0.0.1:'+str(port),
              'image_id':current['image_ids']['powercontext'],'owner_root':str(root),'status':'PREPARED',
              'compose_image':{**image(recipe),'mode':0o600},'provider_source':str(provider)}
+        from . import resource_manager
+        if resource_manager.descriptor_path(root).exists():
+            doc=on_demand_document(doc,root,current,result)
         resources(doc,require_absent=True)
         result.append(doc)
     if len({d['data_namespace'] for d in result})!=len(result):raise HarnessError('Duplicate retained memory volumes; reconcile before recovery')
@@ -215,13 +262,26 @@ def _restore(root,apply=False,origin=None):
     if not apply:return result
     for doc in planned:
         previous=load(doc['origin_root']);base=directory(doc['origin_root'])
+        if doc.get('transition_from_hash'):
+            if not previous or sha(canonical(previous))!=doc['transition_from_hash']:
+                raise HarnessError('Retained service changed before conversion')
+            container=inspect(previous)
+            if container and container.get('State',{}).get('Status')=='running':
+                raise HarnessError('Retained service restarted during conversion; preserve')
+            compose(previous,['down'])
+            doc={k:v for k,v in doc.items() if k!='transition_from_hash'}
+            with Transaction('Convert idle retained memory to on-demand mode') as tx:
+                tx.change(base/'compose.yaml',(Path(root)/'runtimes/powercontext/compose.yaml').read_bytes(),mode=0o600)
+                save(tx,doc)
         if not previous or previous['status']=='REMOVED':
             with Transaction('Prepare retained memory deployment') as tx:
                 tx.change(base/'compose.yaml',(Path(root)/'runtimes/powercontext/compose.yaml').read_bytes(),mode=0o600)
                 if not previous:tx.change(base/'.env',Path(doc['provider_source']).read_bytes(),mode=0o600)
                 save(tx,doc)
-        inspect(doc);compose(doc,['up','-d','--no-build']);inspect(doc)
-    return {**result,'status':'MEMORY_SERVICES_STARTED','readiness':'VERIFY_ON_CALL; each binding checks its original Scope'}
+        inspect(doc)
+        if not doc.get('on_demand'):
+            compose(doc,['up','-d','--no-build']);inspect(doc)
+    return {**result,'status':'MEMORY_SERVICES_PREPARED' if any(d.get('on_demand') for d in planned) else 'MEMORY_SERVICES_STARTED','readiness':'VERIFY_ON_CALL; each binding checks its original Scope'}
 
 
 def restore(root,apply=False,origin=None):
@@ -231,18 +291,18 @@ def restore(root,apply=False,origin=None):
         return _restore(root,True,origin)
 
 
-def start_preflight():
-    docs=[d for d in deployments() if d['status']=='PREPARED']
+def start_preflight(docs=None):
+    docs=docs if docs is not None else [d for d in deployments() if d['status']=='PREPARED']
     for doc in docs:
         verify_origin(doc,source(doc['origin_root']));container=inspect(doc)
-        if not container or container.get('State',{}).get('Status')!='running':free_port(doc['port'])
+        if not container or container.get('State',{}).get('Status')!='running':free_port(backend_port(doc))
     return docs
 
 
-def _manage(action):
-    if action=='start':docs=start_preflight()
+def _manage(action,docs=None):
+    if action=='start':docs=start_preflight(docs)
     else:
-        docs=[d for d in deployments() if d['status']=='PREPARED']
+        docs=docs if docs is not None else [d for d in deployments() if d['status']=='PREPARED']
         for doc in docs:verify_origin(doc,source(doc['origin_root']));inspect(doc)
     result=[]
     for doc in docs:
@@ -266,7 +326,69 @@ def _manage(action):
 
 def manage(action):
     if action=='status':return _manage(action)
-    with ExitStack() as locks:
-        for doc in deployments():
-            if doc['status']=='PREPARED':locks.enter_context(lock(state_dir()/'data-locks'/doc['data_namespace']/'maintenance.lock'))
-        return _manage(action)
+    if action not in {'start','stop','remove'}:raise HarnessError('Unknown memory maintenance operation')
+    docs=[d for d in deployments() if d['status']=='PREPARED']
+    for doc in docs:verify_origin(doc,source(doc['origin_root']));inspect(doc)
+    from . import resource_manager,resource_systemd
+    controlled=[d for d in docs if d.get('on_demand')]
+    raw=[d for d in docs if not d.get('on_demand')]
+    observed={}
+    for doc in controlled:
+        owner=Path(doc['owner_root']);key='retained-'+sidecars.root_id(doc['origin_root'])
+        unit=resource_systemd.status(owner)
+        if unit['status']=='RUNNING':
+            state=resource_manager.control(owner,'status',key)
+            if action in {'stop','remove'} and (state.get('active_calls') or state.get('state') in {'STARTING','STOPPING'}):
+                raise HarnessError('Retained memory has active calls; maintenance refused')
+            observed[doc['origin_root']]=(owner,key)
+        elif action!='remove' or unit.get('state') not in {'inactive','failed'}:
+            raise HarnessError('Retained memory gateway is unavailable; preserve resources')
+    reserved=[]
+    try:
+        if action=='remove':
+            for owner,key in observed.values():
+                resource_manager.control(owner,'quiesce',key);reserved.append((owner,key))
+                resource_manager.control(owner,'stop',key)
+            raw=docs
+        else:
+            # Do not hold a data lock while the gateway worker acquires it.
+            for owner,key in observed.values():resource_manager.control(owner,action,key)
+        with ExitStack() as locks:
+            for doc in raw:locks.enter_context(lock(state_dir()/'data-locks'/doc['data_namespace']/'maintenance.lock'))
+            result=_manage(action,raw)
+        if action!='remove':
+            result.extend({'origin_root':d['origin_root'],'action':action,'mode':'ON_DEMAND_GATEWAY'} for d in controlled)
+        return result
+    finally:
+        for owner,key in reserved:
+            origin=next(d['origin_root'] for d in controlled if 'retained-'+sidecars.root_id(d['origin_root'])==key)
+            current=load(origin)
+            if current and current['status']=='PREPARED':resource_manager.control(owner,'resume',key)
+
+
+def manage_one(origin, action):
+    """Internal gateway entry: mutate exactly one verified retained namespace."""
+    if action not in {'start','stop','status'}:raise HarnessError('Unknown retained memory operation')
+    doc=load(origin)
+    if not doc or doc['status']!='PREPARED':raise HarnessError('Retained memory is not prepared')
+    with lock(state_dir()/'data-locks'/doc['data_namespace']/'maintenance.lock'):
+        verify_origin(doc,source(origin))
+        container=inspect(doc)
+        if action=='start':
+            if not container or container.get('State',{}).get('Status')!='running':free_port(backend_port(doc))
+            compose(doc,['up','-d','--no-build'])
+        elif action=='stop':compose(doc,['stop'])
+        current=inspect(doc)
+        return {'status':'RETAINED_MEMORY_'+action.upper(),'origin_root':str(origin),
+                'container_state':current.get('State',{}).get('Status') if current else 'MISSING',
+                'volumes':'PRESERVED'}
+
+
+def set_manual(origin,enabled):
+    if type(enabled) is not bool:raise HarnessError('Invalid retained memory mode')
+    doc=load(origin)
+    if not doc or not doc.get('on_demand'):raise HarnessError('Retained gateway not prepared')
+    with lock(state_dir()/'data-locks'/doc['data_namespace']/'maintenance.lock'):
+        doc=load(origin);verify_origin(doc,source(origin))
+        with Transaction('Record retained memory manual mode') as tx:
+            save(tx,{**doc,'manual':enabled})

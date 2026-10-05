@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "harness_version": "3.2.0",
+  "harness_version": "3.3.0",
   "registration_owner": "One global explicit-request entry; one project skills source and Main Router; no duplicate plugin/standalone hooks",
   "runtime_selection": "UNVERIFIED",
   "skills": [
