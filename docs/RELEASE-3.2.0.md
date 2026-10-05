@@ -2,6 +2,19 @@
 
 v3.2.0 按用户明确决定作为下一正式发行版提供下载。完整 PRD 的 60 项需求与 22 个场景继续保留；正式发布不代表尚缺证据的验收项已通过。
 
+文档已补充执行位置说明。Release 的独立 Markdown/HTML 附件与在线指南为更新后的说明；原 v3.2.0 程序安装包及其 SHA256 保持不变，包内文档可能早于本次说明修订。
+
+## 下载后在哪里操作
+
+| 操作 | 位置 |
+| --- | --- |
+| 下载、安装、`harness` 命令 | 安装所在 Linux 电脑的系统终端，使用 Bash；不要粘贴进 PowerShell/CMD |
+| “用 Harness……”等任务需求 | Codex Desktop 打开业务项目后的聊天输入框 |
+| 项目加载、只读/写权限、Hook 信任 | Codex Desktop 原生界面与权限菜单 |
+| 阅读 HTML 手册 | 下载 HTML，在浏览器打开；浏览器不执行安装命令 |
+
+本版目标为 Linux x86_64；Windows/WSL 未完成独立安装验收。首次安装、首次接入、日常聊天和旧版升级是四个不同步骤，按上方分步指南依次选择。已有旧版请使用更新流程，不重跑首次安装覆盖它。
+
 ## 主要变化
 
 - 明确选择 Harness 后，模糊需求先检查、提供建议并确认具体范围；项目准备与业务修改分别授权。
@@ -29,7 +42,7 @@ v3.2.0 按用户明确决定作为下一正式发行版提供下载。完整 PRD
 
 ## 使用范围
 
-优先阅读 [安装说明](../INSTALLATION.md)，在独立目录和独立安装状态中试用。不要把正式发布安装命令视为下载此草稿分支的入口。GitHub Release 提供 Linux x86_64 安装包、SHA256 校验文件、安装脚本及 HTML 手册。发布不自动替换本机已有正式安装。
+优先阅读 [分步使用指南](https://github.com/yelei1027/codex-engineering-harness-v3/blob/main/README.md) 与 [详细安装说明](https://github.com/yelei1027/codex-engineering-harness-v3/blob/main/INSTALLATION.md)。GitHub Release 提供 Linux x86_64 安装包、SHA256 校验文件、安装脚本及 HTML 手册。发布不自动替换本机已有正式安装。
 
 ## 与原 V3.0.0 HTML 的差异
 

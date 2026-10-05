@@ -2,6 +2,14 @@
 
 本文针对 v3.2.0。当前版本按用户决定正式发布，已知原生证据限制仍保留，详见 [发行说明](docs/RELEASE-3.2.0.md)。旧项目升级必须经过候选接受与显式迁移。
 
+## 命令执行位置
+
+- 本文所有 `bash` 代码块：在安装 Harness 的 **Linux 电脑系统终端（Bash）** 执行，使用日常登录用户，不是 Windows PowerShell/CMD，也不是直接发到 Agent 聊天框。
+- 标注“客户端聊天框”的文本：在 Codex Desktop 项目聊天中发送；权限菜单和 Hook 信任是客户端界面操作。
+- 带 `/项目`、`TASK`、`PLAN`、`操作ID` 的命令是模板，须替换为实际值；任务和事实文件由已有工作流生成，不能凭空填写。
+- 除“发布前核验”外，绝对路径命令可从任意目录运行；发布前核验必须在 Harness 源码仓库根目录执行。使用 `.` 的命令必须先进入目标项目根目录。
+- 初次使用请先按 [README 的分步指南](README.md) 操作。Windows/PowerShell 与 WSL 未提供已验收的安装方案。
+
 ## 一次准备本体
 
 源码完整准备前可运行 `python3 bin/harness preflight`；已有共享入口时用 `harness preflight`。它只读检查 Linux x86_64、明确选择的 Codex 运行时、基础工具、systemd 用户会话和 Docker，缺失时给出下一步。完整准备自动执行同一检查，条件不足时不开始登记、下载或组件准备。兼容下限来自清单，当前为 Codex 0.160.0；额外 Provider Key 用到时再配置，登录和实际调用另行核验。
@@ -11,6 +19,8 @@
 当前支持目标是个人 Linux x86_64 Codex Desktop。先核对 Git、Node/npm、Python 3、uv、Docker Compose、用户级 systemd 和 Codex Desktop。私有仓库访问先使用 `gh auth login`，不会把 Codex 登录凭据导出给第三方 Provider。
 
 正式包的获取方式见 [README](README.md)。使用已经确认的新版源码或解包目录时，可以从任意位置运行：
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 python3 "/你的Harness目录/bin/harness" install --prepare
@@ -24,11 +34,15 @@ python3 "/你的Harness目录/bin/harness" install --prepare
 
 先只读查看影响：
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness prepare "/你的项目路径"
 ```
 
 核对是否初始化本地 Git、添加哪些配置/技能、接入配置与 Hook、权限默认和会话加载要求。已有适用授权就继续；否则确认这份准备范围一次，再执行：
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 harness prepare "/你的项目路径" --apply
@@ -41,6 +55,8 @@ harness prepare "/你的项目路径" --apply
 若 Hook 提示“没有注入规划”，先运行 `harness check` 检查安装文件。Hook 入口、规划脚本或锁定清单缺失、被改都会阻止 L2 接入；先准备完整版本，再核对原生信任和实际规划注入。运行成功、文件完整和已获信任分别验证。
 
 然后明确选择：
+
+**执行位置：Codex Desktop · 项目聊天框（发送文字）。**
 
 ```text
 用 Harness，先只读检查这个项目并引导我确认优化范围。
@@ -62,6 +78,8 @@ harness prepare "/你的项目路径" --apply
 
 ## 状态与服务
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness status
 harness doctor "/项目路径" --deep
@@ -76,6 +94,8 @@ harness processes status
 ## 更新与项目迁移
 
 先给明确版本、来源、受影响项目、资源和恢复边界摘要。已有相同维护范围授权不重复确认。
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 harness update --to "/明确的新版本来源目录"
@@ -93,6 +113,8 @@ harness update --to "/明确的新版本来源目录"
 
 新版本接受后，旧项目仍绑定旧根，活动或暂停任务不会自动换依赖。任务结束后，预览迁移：
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness migrate "/项目路径" --from "/旧安装根"
 # 核对具体范围，按适用授权执行：
@@ -102,6 +124,8 @@ harness migrate "/项目路径" --from "/旧安装根" --apply
 同安装根的 Overlay 更新才使用 `harness refresh`。迁移保留业务文件、任务记录和旧根；Hook 定义变化按原生要求重新审阅。未知所有权或后来的修改会阻止覆盖。
 
 ## 完整卸载与重装
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 harness uninstall
@@ -117,6 +141,8 @@ harness uninstall --apply
 
 重装后查看数据恢复计划：
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness recover-data
 harness recover-data --apply
@@ -128,6 +154,8 @@ harness recover-data --apply
 
 本轮源码新增 `recover-memory`，使用当前已准备的锁定 PowerContext 镜像启动其它已卸载根的保留数据卷。完整 `install --prepare` 自动接续这项恢复；也可先查看具体范围再执行：
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness recover-memory
 harness recover-memory --apply
@@ -136,6 +164,8 @@ harness recover-memory --apply
 恢复保留原地址和项目绑定，不合并数据库、不创建替代 Scope。原端口被占用、数据卷缺失或有未知消费者、恢复代次变化、镜像与原服务不一致时保留冲突，不能自动升级数据库。服务启动与精确 Scope/Revision 回读分别验证；只启动容器不表示所有记忆已验证。`services` 和完整卸载同时管理这些恢复服务，输出保留的环境文件和数据卷位置。完整原生验收的剩余限制见发行说明。
 
 卸载中断则使用原操作 ID：
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 harness uninstall-recover 操作ID
@@ -148,6 +178,8 @@ harness uninstall-recover 操作ID --apply
 
 长任务使用已有任务与选定 `plan-id`，保存 Checkpoint 后压缩，恢复时核对代码、任务实例、范围与证据。同名任务重建不继承旧摘要；分支和忽略目录中的证据变化也检查。
 
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
+
 ```bash
 harness context checkpoint /项目 --task TASK --facts /项目/.harness/task/TASK/context-facts.json --plan-id PLAN
 harness context verify /项目 --task TASK
@@ -156,6 +188,10 @@ harness context verify /项目 --task TASK
 普通压缩只做本地 Checkpoint。确实需要跨会话时才使用 PowerContext Basic 的正式 Handoff 与指定 Scope/Revision；Full 自动记忆另需 Provider 与真实验证。
 
 ## 发布前核验
+
+仅面向维护者。先在 Linux Bash 终端进入 Harness 源码仓库根目录；这些不是业务项目中日常需要运行的命令。
+
+**执行位置：Linux 终端 · Bash。下列路径、ID 和文件占位符须替换为实际值。**
 
 ```bash
 python3 -m unittest discover -s tests -v
