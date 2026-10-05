@@ -3,8 +3,8 @@
 面向 Codex / Vibe Coding 的项目级开发 Harness。
 目标：完整组件一次准备；明确说“用 Harness”后进入当前项目流程，模糊需求先引导，明确且已授权任务直接推进。
 
-> 当前稳定版：`v3.1.1` · Linux x86_64 · Codex Desktop
-> 本轮源码：按 [PRD #1](https://github.com/yelei1027/codex-engineering-harness-v3/issues/1) 实施和验收中。新版入口与权限默认值尚未发布到正式 Release。下文新增流程针对本轮源码；已有发行报告只证明其记录版本。
+> 当前发行版：`v3.2.0` · Linux x86_64 · Codex Desktop
+> 本版按用户决定正式发布，仍保留明确的未验证项；发布不等于完整 PRD 验收通过。请先阅读 [发行说明与已知限制](docs/RELEASE-3.2.0.md)。
 
 ## 核心能力
 
@@ -53,7 +53,7 @@ gh api repos/yelei1027/codex-engineering-harness-v3/contents/scripts/install-rel
 默认安装目录：
 
 ```text
-~/.local/share/codex-engineering-harness/releases/3.1.1
+~/.local/share/codex-engineering-harness/releases/3.2.0
 ```
 
 安装完成后验证：
