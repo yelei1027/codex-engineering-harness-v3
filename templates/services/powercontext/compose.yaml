@@ -1,7 +1,7 @@
 services:
   powercontext:
-    image: codex-harness-powercontext:6b2f6e8
-    container_name: codex-harness-powercontext
+    image: ${HARNESS_POWERCONTEXT_IMAGE:?prepare managed service layout first}
+    container_name: ${HARNESS_SERVICE_NAMESPACE:?}-powercontext
     env_file: .env
     ports:
       - "127.0.0.1:${POWERCONTEXT_PORT:-18080}:8000"
@@ -10,4 +10,7 @@ services:
     restart: unless-stopped
 volumes:
   powercontext-data:
-    name: codex-harness-powercontext-data
+    name: ${HARNESS_VOLUME_NAMESPACE:?}-powercontext-data
+    labels:
+      com.harness.state_id: ${HARNESS_STATE_ID:?}
+      com.harness.data_namespace: ${HARNESS_VOLUME_NAMESPACE:?}

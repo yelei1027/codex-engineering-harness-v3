@@ -2,16 +2,20 @@
 import ipaddress
 import json
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import urlparse,quote
 from urllib.request import Request, urlopen
 
 from .common import HarnessError, canonical, lock, read_json, sha, write_json
+from pathlib import Path
 from .transaction import safe_parent
 
 
-def service_url():
+def service_url(root=None):
     from . import cli
-    value=read_json(cli.ROOT/'services-binding.json',{}).get('service_urls',{}).get('powercontext')
+    root=cli.ROOT if root is None else Path(root)
+    safe_parent(root/"services-binding.json")
+    if (root/"services-binding.json").is_symlink():raise HarnessError("PowerContext service binding is a symlink")
+    value=read_json(root/'services-binding.json',{}).get('service_urls',{}).get('powercontext')
     if not value:raise HarnessError('PowerContext service is not configured')
     parsed=urlparse(value)
     try:local=parsed.hostname=='localhost' or ipaddress.ip_address(parsed.hostname).is_loopback
@@ -30,20 +34,82 @@ def request(url,path,payload=None):
         raise HarnessError('PowerContext request failed; local checkpoint is preserved') from error
 
 
+def binding_plan(repo,source_root=None):
+    from . import cli,installations,sidecars,memory_services
+    path=repo/'.harness/state/memory.json';safe_parent(path)
+    if path.is_symlink():raise HarnessError('Refuse a symlink memory binding')
+    previous=read_json(path)
+    if not previous:return {'status':'NO_MEMORY_BINDING','data_migration':'NONE'}
+    if previous.get('repo')!=str(repo) or not isinstance(previous.get('scope_id'),str):raise HarnessError('Memory binding belongs to another project')
+    # Validate even a mismatching saved URL before considering alternate roots.
+    parsed=urlparse(previous.get('url',''))
+    try:local=parsed.hostname=='localhost' or ipaddress.ip_address(parsed.hostname).is_loopback
+    except (ValueError,TypeError):local=False
+    if parsed.scheme!='http' or not local or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise HarnessError('Memory binding requires a verified loopback service')
+    try:current_url=service_url()
+    except HarnessError:current_url=None
+    saved_root=previous.get('service_root')
+    recovered=None
+    if saved_root or source_root:
+        selected=Path(saved_root or source_root)
+        if selected!=Path(cli.ROOT) and str(selected) not in installations.roots():
+            recovered=memory_services.binding(selected,previous['url'],previous.get('data_namespace'))
+        if not recovered and service_url(selected)!=previous['url']:
+            raise HarnessError('Original memory endpoint changed; preserve its Scope binding')
+    elif previous.get('url')==current_url:
+        selected=Path(cli.ROOT)
+    else:
+        known=installations.roots()
+        candidates=[]
+        for name in known:
+            try:
+                if service_url(name)==previous['url']:candidates.append(name)
+            except HarnessError:continue
+        candidates.extend(d['origin_root'] for d in memory_services.deployments() if d['status']=='PREPARED' and d['url']==previous['url'])
+        if len(candidates)!=1:raise HarnessError('Original memory service is not an active registered installation; local data preserved')
+        selected=Path(candidates[0])
+        if str(selected) not in known:recovered=memory_services.binding(selected,previous['url'],previous.get('data_namespace'))
+        elif service_url(selected)!=previous['url']:raise HarnessError('Original memory endpoint changed; preserve its Scope binding')
+    deployment=recovered or sidecars.layout(selected)
+    data_namespace=deployment['data_namespace'] if deployment else None
+    if previous.get('data_namespace') and previous['data_namespace']!=data_namespace:
+        raise HarnessError('Original memory data namespace changed; preserve binding')
+    if selected!=Path(cli.ROOT):
+        if not deployment:raise HarnessError('Original memory service has no verified resource ownership; preserve binding')
+        port=recovered['port'] if recovered else deployment['ports']['powercontext']
+        if previous['url']!='http://127.0.0.1:'+str(port):
+            raise HarnessError('Original memory endpoint differs from the owned service port; preserve binding')
+    return {'status':'MEMORY_RECOVERED_SERVICE' if recovered else 'MEMORY_PINNED_TO_ORIGINAL_SERVICE' if selected!=Path(cli.ROOT) else 'MEMORY_CURRENT_SERVICE',
+            'service_root':str(selected),'data_namespace':data_namespace,'url':previous['url'],'scope_id':previous['scope_id'],
+            'scope_validation':'REQUIRED_ON_CALL','data_migration':'NONE; source and Scope remain in the original verified service'}
+
+
+def migration_status(repo,source_root=None):
+    try:return binding_plan(repo,source_root)
+    except HarnessError as error:return {'status':'UNSYNCED','reason':str(error),'data_migration':'NOT_PERFORMED; local binding preserved'}
+
+
 def bind(repo):
     path=repo/'.harness/state/memory.json';safe_parent(path)
     if path.is_symlink():raise HarnessError('Refuse a symlink memory binding')
     with lock(repo/'.harness/state/memory.lock'):
         previous=read_json(path)
         if previous:
-            if previous.get('repo')!=str(repo) or previous.get('url')!=service_url() or not isinstance(previous.get('scope_id'),str):
-                raise HarnessError('PowerContext binding does not match this project and loopback service')
+            planned=binding_plan(repo)
+            if planned['status'] in {'MEMORY_PINNED_TO_ORIGINAL_SERVICE','MEMORY_RECOVERED_SERVICE'}:
+                if request(planned['url'],'/health/ready').get('status')!='ready':raise HarnessError('Original memory service is not ready; local binding preserved')
+                scoped=request(planned['url'],'/v1/scopes/'+quote(previous['scope_id'],safe=''))
+                if scoped.get('scope_id')!=previous['scope_id']:raise HarnessError('Original memory service returned another Scope; preserve binding')
             return previous
         url=service_url()
         if request(url,'/health/ready').get('status')!='ready':raise HarnessError('PowerContext service is not ready')
         scope=request(url,'/v1/scopes',{'title':'Harness: '+repo.name,'summary':'Project task summaries and exact cross-session handoffs',
                                       'idempotency_key':'harness-project-'+sha(str(repo).encode())})
-        result={'repo':str(repo),'url':url,'scope_id':scope['scope_id'],'mode':'BASIC_AGENT_SUMMARY','full_automatic_extraction':'NOT_CONFIGURED'}
+        from . import cli,sidecars
+        deployment=sidecars.layout(cli.ROOT)
+        result={'repo':str(repo),'url':url,'scope_id':scope['scope_id'],'service_root':str(cli.ROOT),
+                'data_namespace':deployment['data_namespace'] if deployment else None,'mode':'BASIC_AGENT_SUMMARY','full_automatic_extraction':'NOT_CONFIGURED'}
         write_json(path,result)
         return result
 

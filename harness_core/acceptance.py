@@ -5,10 +5,84 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from .common import HarnessError, canonical, new_id, now, private_path, read_json, sha, state_dir, write_json
+from .common import HarnessError, canonical, distribution_path, new_id, now, private_path, read_json, sha, state_dir, write_json
 from .transaction import Transaction
 
-REQUIRED={'STATIC','RUNTIME','TRIGGER','MCP','REVIEW','RECOVERY','ISOLATION'}
+REQUIRED={'STATIC','RUNTIME','TRIGGER','MCP','HOOKS','REVIEW','RECOVERY','ISOLATION'}
+
+
+def verify_candidate_runtime(candidate,binding):
+    """A copied source must not borrow another installation's prepared tools."""
+    from . import software,sidecars
+    candidate=Path(candidate).resolve()
+    software.require_preparation_idle(candidate)
+    owned=software.verify_all(candidate)
+    if not owned.get('files'):raise HarnessError('Candidate dependencies are not prepared; bootstrap its owned runtimes before acceptance')
+    required=[]
+    if (candidate/'manifests/node/package-lock.json').is_file():required.append('runtimes/node')
+    if (candidate/'manifests/markitdown-requirements.lock').is_file():required.append('runtimes/markitdown')
+    for area in required:
+        if not any(Path(area) in Path(name).parents for name in owned['files']):
+            raise HarnessError('Candidate required runtime is not prepared: '+area)
+    layout=sidecars.layout(candidate)
+    expected_groups={g for g in sidecars.GROUPS if (candidate/'templates/services'/g/'compose.yaml').is_file()}
+    if expected_groups and (not layout or not expected_groups<=set(layout['recipes'])):
+        raise HarnessError('Candidate required sidecars are not prepared')
+    urls=set()
+    if layout:
+        base_urls=sidecars.require_live_binding(candidate)
+        urls.update(base_urls)
+        if 'powercontext' in layout['recipes']:
+            urls.add('http://127.0.0.1:'+str(layout['ports']['powercontext'])+'/mcp/')
+        from urllib.parse import urlparse
+        for value in urls:
+            try:
+                parsed=urlparse(value)
+                valid=(parsed.scheme=='http' and parsed.hostname in {'127.0.0.1','localhost'}
+                       and parsed.port in layout['ports'].values() and not parsed.username and not parsed.password
+                       and not parsed.query and not parsed.fragment)
+            except (ValueError,TypeError):valid=False
+            if not valid:
+                raise HarnessError('Candidate binding references an unowned service URL')
+    source_files=read_json(candidate/'.harness-install/receipt.json',{}).get('files',{})
+    executable_files=set(owned['files'])|set(source_files)
+    host_codex=binding.get('codex_binary');host_node=shutil.which('node')
+    def local(value,exists=False):
+        path=Path(value)
+        return (path.is_absolute() and path.is_relative_to(candidate) and path.resolve().is_relative_to(candidate)
+                and (not exists or path.is_file() and
+                     (str(path.relative_to(candidate)) in executable_files or str(path.resolve().relative_to(candidate)) in executable_files)))
+    def argument(value):
+        part=value.split('=',1)[-1]
+        if '://' in part:
+            if part not in urls:raise HarnessError('Candidate binding references an unowned service URL')
+        elif Path(part).is_absolute() and not local(part):
+            raise HarnessError('Candidate binding references another runtime path')
+        elif '..' in Path(part).parts:raise HarnessError('Candidate binding contains an escaping runtime argument')
+    def command(name,argv):
+        if not isinstance(argv,list) or not argv or not all(isinstance(v,str) for v in argv):raise HarnessError('Invalid candidate component command')
+        program=argv[0]
+        system_codex=name=='codex' and program==host_codex and Path(program).is_file()
+        system_node=(name=='context-mode' and host_node and Path(program).resolve()==Path(host_node).resolve()
+                     and len(argv)>1 and local(argv[1],True))
+        if not (local(program,True) or system_codex or system_node):
+            raise HarnessError('Candidate binding references another runtime path; bootstrap the isolated candidate')
+        for arg in argv[1:]:argument(arg)
+    for name,argv in binding.get('component_commands',{}).items():command(name,argv)
+    for name,server in binding.get('mcp_servers',{}).items():
+        if not isinstance(server,dict):raise HarnessError('Invalid candidate MCP binding')
+        if 'command' in server:command(name,[server['command'],*server.get('args',[])])
+        elif server.get('url') not in urls:raise HarnessError('Candidate MCP binding references an unowned service URL')
+        for value in server.get('env',{}).values():
+            if isinstance(value,str):argument(value)
+    return owned
+
+
+def runtime_fingerprint(candidate):
+    from . import software,sidecars
+    return sha(canonical({'software':read_json(software.snapshot_path(candidate),{}),
+                          'services':sidecars.layout(candidate),
+                          'binding':read_json(candidate/'services-binding.json',{})}))
 
 
 def execute(argv,candidate,env,category,timeout=60):
@@ -39,6 +113,8 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
     from . import cli
     source=Path(source).expanduser().resolve()
     if not source.is_dir() or not (source/'VERSION').exists():raise HarnessError('--to must name an explicit local release directory')
+    missing,errors=cli.pwf_hook_problems(source)
+    if missing or errors:raise HarnessError('Locked PWF hook files unavailable or changed: '+str(missing+errors))
     report=read_json(source/'candidate-report.json')
     if report:
         candidate=source;identifier=report['candidate_id']
@@ -52,13 +128,14 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
             trees=read_json(source/'manifests/source-trees.json',{})
             for n in items:
                 item=relative/n
-                if private_path(item) or item.parts[0] in {'reports','.codex','state','data'} or n in {'candidate-report.json','candidate-acceptance.json'}:result.append(n);continue
+                if not distribution_path(item) or item.parts[0] in {'reports','.codex','state','data'} or n in {'candidate-report.json','candidate-acceptance.json'}:result.append(n);continue
                 if item.parts[0]=='.agents' and str(item) not in {'.agents','.agents/plugins','.agents/plugins/marketplace.json'}:result.append(n);continue
                 if item.parts[0]=='vendor' and len(item.parts)>=2:
                     files=trees.get(item.parts[1],{}).get('files',{})
                     path=str(Path(*item.parts[2:])) if len(item.parts)>2 else ''
                     if path and path not in files and not any(f.startswith(path+'/') for f in files):result.append(n)
             return result
+        if candidate.exists() or candidate.is_symlink():raise HarnessError('Candidate destination already exists; preserve unknown content')
         try:
             shutil.copytree(source,candidate,ignore=ignored,symlinks=True)
             trees=read_json(candidate/'manifests/source-trees.json',{})
@@ -71,14 +148,27 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
                 known=trees.get(relative.parts[1],{}).get('files',{}).get(str(Path(*relative.parts[2:])),{})
                 if known.get('kind')!='symlink' or known.get('target')!=target:raise HarnessError('Unowned candidate symlink: '+str(relative))
             binding=read_json(source/'machine-binding.json')
-            if binding:write_json(candidate/'machine-binding.json',binding)
+            # Keep only host Codex selection; dependency and service bindings
+            # must be generated by preparation inside this new candidate.
+            if binding:write_json(candidate/'machine-binding.json',{k:binding[k] for k in
+                ['codex_binary','codex_version','codex_launch_mode'] if k in binding})
             write_json(candidate/'candidate-report.json',{'candidate_id':identifier,'candidate':str(candidate),'status':'BUILDING','created':now()})
+            files={}
+            for copied in candidate.rglob('*'):
+                if not distribution_path(copied.relative_to(candidate)):continue
+                if copied.is_symlink():files[str(copied.relative_to(candidate))]={'link':os.readlink(copied)}
+                elif copied.is_file():files[str(copied.relative_to(candidate))]={'sha256':sha(copied.read_bytes())}
+            write_json(candidate/'.harness-install/receipt.json',{'schema_version':1,'target':str(candidate),'state':str(state_dir()),
+                       'origin':'COPIED_UPDATE_CANDIDATE','files':files})
+            from . import installations
+            with Transaction('Register isolated candidate source '+identifier) as tx:
+                installations.register_candidate(tx,{'root':str(candidate),'version':(candidate/'VERSION').read_text().strip(),'release_hash':cli.release_hash(candidate)})
         except BaseException:
             shutil.rmtree(candidate,ignore_errors=True);raise
         report=read_json(candidate/'candidate-report.json')
     # Tests and commands use a separate control state/Codex home; old accepted stays untouched.
     isolated=candidate/'candidate-private';isolated.mkdir(exist_ok=True)
-    env=os.environ.copy();env.update(HARNESS_STATE_DIR=str(isolated/'state'),HARNESS_BIN_DIR=str(isolated/'bin'),CODEX_HOME=str(isolated/'codex'),PLANNING_DISABLED='1')
+    env=os.environ.copy();env.update(PYTHONDONTWRITEBYTECODE='1',HARNESS_STATE_DIR=str(isolated/'state'),HARNESS_BIN_DIR=str(isolated/'bin'),CODEX_HOME=str(isolated/'codex'),PLANNING_DISABLED='1')
     check=cli.static_check(candidate)
     tests=execute([sys.executable,'-m','unittest','discover','-s','tests'],candidate,env,'STATIC',120)
     # unittest exits 0 for zero tests: never treat that as acceptance.
@@ -114,12 +204,15 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
         if not plan or plan.get('release_hash')!=release or plan.get('machine_binding_hash')!=binding_hash:
             raise HarnessError('Acceptance plan must bind exact candidate release_hash and machine_binding_hash')
         checks=plan.get('checks',[]);categories={c.get('category') for c in checks}
-        needed=REQUIRED|({'HOOKS'} if binding.get('hooks') else set())
+        needed=REQUIRED
         if not needed<=categories:raise HarnessError('Acceptance plan missing required categories: '+str(sorted(needed-categories)))
+        verify_candidate_runtime(candidate,binding)
+        runtime_hash=runtime_fingerprint(candidate)
         receipts=[tests]+[execute(c['command'],candidate,env,c['category'],c.get('timeout',60)) for c in checks]
+        if runtime_fingerprint(candidate)!=runtime_hash:raise HarnessError('Candidate runtime changed during acceptance; repeat verification')
         receipt={'candidate_id':identifier,'release_hash':release,'machine_binding_hash':binding_hash,'plan_sha256':sha(Path(acceptance_plan).read_bytes()),
                  'status':'PASS' if all(c['status']=='PASS' for c in receipts) else 'FAIL','created':now(),'receipts':receipts,
-                 'required_categories':sorted(needed),'evidence_scope':'ACTUAL_ISOLATED_COMMAND_EXECUTION'}
+                 'required_categories':sorted(needed),'runtime_fingerprint':runtime_hash,'evidence_scope':'ACTUAL_ISOLATED_COMMAND_EXECUTION'}
         acceptance_path=state_dir()/'candidate-acceptance'/f'{identifier}.json'
         write_json(acceptance_path,receipt)
         report['acceptance']={'path':str(acceptance_path),'sha256':sha(acceptance_path.read_bytes()),'status':receipt['status']}
@@ -137,35 +230,52 @@ def update_candidate(source,promote=False,acceptance_plan=None,acceptance=None):
     if receipt.get('candidate_id')!=identifier or receipt.get('release_hash')!=release or receipt.get('machine_binding_hash')!=binding_hash:
         raise HarnessError('Acceptance is stale for this candidate; accepted release unchanged')
     if not binding:raise HarnessError('Candidate machine binding required for activation')
-    def stale_runtime(value):
-        if isinstance(value,str):return str(old_root) in value and str(candidate) not in value
-        if isinstance(value,dict):return any(stale_runtime(v) for v in value.values())
-        if isinstance(value,list):return any(stale_runtime(v) for v in value)
-        return False
-    if stale_runtime(binding):raise HarnessError('Candidate binding still refers to accepted runtime paths; bootstrap isolated candidate dependencies before promotion')
-    if cli.release_hash(candidate)!=release or sha(canonical(read_json(candidate/'machine-binding.json',{})))!=binding_hash:
-        raise HarnessError('Candidate changed during acceptance; no accepted writes performed')
-    if any(c.get('status')!='PASS' or not c.get('pid') or not c.get('run_id') for c in receipt['receipts']):
-        raise HarnessError('Invalid actual process acceptance receipt')
-    if not cli.launcher_path().exists():raise HarnessError('Install the managed launcher before promotion')
-    launch=read_json(state_dir()/'launcher.json',{})
-    from .transaction import image
-    if launch.get('path')!=str(cli.launcher_path()) or image(cli.launcher_path())!=launch.get('image'):
-        raise HarnessError('Managed launcher ownership changed; accepted release unchanged')
-    wanted={'version':report['version'],'root':str(candidate),'release_hash':release}
-    try:
-        with Transaction('Promote accepted candidate '+identifier) as tx:
-            tx.change(state_dir()/'accepted.json',canonical(wanted)+b'\n',mode=0o600)
-            active_env=os.environ.copy();active_env['HARNESS_STATE_DIR']=str(state_dir())
-            activated=execute([sys.executable,str(cli.launcher_path()),'doctor','--deep'],candidate,active_env,'ACTIVATION')
-            if activated['returncode'] or (json.loads(activated['stdout']).get('status')=='FAIL'):
-                raise HarnessError('Promote activation doctor failed; touched accepted registration restored')
-            if cli.release_hash(candidate)!=release or sha(canonical(read_json(candidate/'machine-binding.json',{})))!=binding_hash:
-                raise HarnessError('Candidate changed during activation; accepted registration restored')
-            report.update(promotion='ACCEPTED',activation=activated,transaction_id=tx.id,status='PROMOTED')
-            tx.change(candidate/'candidate-report.json',canonical(report)+b'\n',mode=0o600)
-    except BaseException as error:
-        report.update(promotion='ROLLED_BACK',status='ACTIVATION_FAILED',error=str(error))
-        write_json(candidate/'candidate-report.json',report)
-        raise
-    return report
+    if not REQUIRED<=set(receipt.get('required_categories',[])) or not REQUIRED<={r.get('category') for r in receipt.get('receipts',[])}:
+        raise HarnessError('Candidate acceptance lacks current required categories, including HOOKS')
+    verify_candidate_runtime(candidate,binding)
+    def activate():
+        if receipt.get('runtime_fingerprint')!=runtime_fingerprint(candidate):
+            raise HarnessError('Candidate runtime changed after acceptance; repeat verification before promotion')
+        verify_candidate_runtime(candidate,binding)
+        if cli.release_hash(candidate)!=release or sha(canonical(read_json(candidate/'machine-binding.json',{})))!=binding_hash:
+            raise HarnessError('Candidate changed during acceptance; no accepted writes performed')
+        if any(c.get('status')!='PASS' or not c.get('pid') or not c.get('run_id') for c in receipt['receipts']):
+            raise HarnessError('Invalid actual process acceptance receipt')
+        # Portable source/binding hashes exclude mutable deployment and runtime
+        # ownership. Recheck them before changing the accepted registration.
+        from . import software, sidecars, processes
+        software.verify_all(candidate)
+        sidecars.layout(candidate)
+        processes.require_idle(candidate)
+        if not cli.launcher_path().exists():raise HarnessError('Install the managed launcher before promotion')
+        launch=read_json(state_dir()/'launcher.json',{})
+        from .transaction import image
+        if launch.get('path')!=str(cli.launcher_path()) or image(cli.launcher_path())!=launch.get('image'):
+            raise HarnessError('Managed launcher ownership changed; accepted release unchanged')
+        cli.entry_registration(candidate,launch)
+        wanted={'version':report['version'],'root':str(candidate),'release_hash':release}
+        try:
+            with Transaction('Promote accepted candidate '+identifier) as tx:
+                from . import installations
+                installations.register(tx,wanted,prior)
+                tx.change(state_dir()/'accepted.json',canonical(wanted)+b'\n',mode=0o600)
+                skill_record=cli.register_entry(tx,candidate,launch)
+                tx.change(state_dir()/'launcher.json',canonical({**launch,'entry_skill':skill_record})+b'\n',mode=0o600)
+                active_env=os.environ.copy();active_env['HARNESS_STATE_DIR']=str(state_dir())
+                activated=execute([sys.executable,str(cli.launcher_path()),'doctor','--deep'],candidate,active_env,'ACTIVATION')
+                if activated['returncode'] or (json.loads(activated['stdout']).get('status')=='FAIL'):
+                    raise HarnessError('Promote activation doctor failed; touched accepted registration restored')
+                if cli.release_hash(candidate)!=release or sha(canonical(read_json(candidate/'machine-binding.json',{})))!=binding_hash:
+                    raise HarnessError('Candidate changed during activation; accepted registration restored')
+                report.update(promotion='ACCEPTED',activation=activated,transaction_id=tx.id,status='PROMOTED')
+                tx.change(candidate/'candidate-report.json',canonical(report)+b'\n',mode=0o600)
+        except BaseException as error:
+            report.update(promotion='ROLLED_BACK',status='ACTIVATION_FAILED',error=str(error))
+            write_json(candidate/'candidate-report.json',report)
+            raise
+        return report
+
+    from .common import lock
+    with lock(candidate/'.harness-install/preparation.lock'):
+        with lock(candidate/'.harness-install/services.lock'):
+            return activate()

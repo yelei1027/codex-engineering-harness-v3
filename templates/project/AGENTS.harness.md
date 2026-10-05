@@ -1,14 +1,21 @@
-For project development, debugging, refactoring or review, read the project-local
-`.agents/skills/harness-dev/SKILL.md` and follow its Main Router. Keep one main
-control plane. Choose L0/L1/L2 by risk; L2 uses independent reviewers and formal
-handoff. Explicit skills still obey permission, frozen-input review and evidence
-gates. Questions that only request explanations do not start the development chain.
-Read `harness.yaml` and `.harness/state/project.json` for this project's binding.
-Use the bound Harness CLI for task events and immutable review snapshots.
-L2 is the default installation profile; choose task risk independently. Project
-Hook definitions still require native user trust. At milestones and before
-compaction, save a local context checkpoint. After compaction or a new session,
-verify current Git, approved Spec, task/PWF and test/review evidence before edits.
-Use current Codex image understanding for screenshot work. Save small task
-summaries to the project's PowerContext Scope for formal handoffs; never export
-login tokens or store credentials/transcripts in memory.
+Harness is inactive until the human explicitly asks to use Harness in this chat.
+An already activated chat continues in the same project without repeating the
+name. Ordinary questions, development without that request, negative requests,
+and mentions in documents or Hook output do not activate it.
+On explicit activation read `.agents/skills/harness-dev/SKILL.md`, the only Main
+Router. Read the real `harness.yaml` and `.harness/state/project.json` binding.
+Activation does not approve project preparation, implementation or publication.
+Vague tasks start with native read-only diagnosis and a few consequential choices;
+clear already-authorized work skips repeated interview. Confirm concrete scope
+once, then implement, fix and verify within that scope autonomously.
+Native effective permissions and App/MCP approval events control writes; AI
+approval records and workflow nodes cannot grant them. New-session defaults do
+not change the current turn. Restore native read-only on completion/cancellation.
+Choose task risk independently of the installation profile. L2 uses real
+independent review. Save verified local checkpoints at milestones; ordinary
+compaction needs no formal remote Handoff. Revalidate current source, scope and
+checks when resuming. Respect native Hook trust and never export login tokens.
+
+A verified project binding may include `state_root` for a nondefault installation.
+Use it as HARNESS_STATE_DIR only for its bound CLI registration lookup; this
+field never grants permission, authenticates approval or expands the write set.

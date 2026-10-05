@@ -1,6 +1,7 @@
 {
   "codex_binary": "/usr/lib/chatgpt/resources/codex",
   "codex_version": "0.160.0",
+  "minimum_codex_version": "0.160.0",
   "older_path_binary": "/snap/codex/34/bin/codex 0.114.0",
   "plugin_format": "portable with Codex compatibility manifest; lean staging root",
   "registration": "project skills and project config MCP; catalog plugin installation is an alternative, never simultaneous skill registration",
@@ -12,5 +13,6 @@
   "planning_with_files": "project L2 standalone hooks; no global PWF hooks; native user trust remains required",
   "powercontext": "Basic explicit Handoff via loopback Docker; no generation or embeddings configured",
   "screenshot_to_code": "locked Docker frontend/backend + Chromium; provider generation not enabled",
-  "schema_status": "runtime plugin add validated, application UI @ entry not verified"
+  "schema_status": "runtime plugin add validated, application UI @ entry not verified",
+  "stdio_lifecycle": "Linux Desktop user systemd scopes; exact per-invocation receipts; prompt permission remains native; no fallback to unowned PID termination"
 }

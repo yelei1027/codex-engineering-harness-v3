@@ -15,7 +15,7 @@ async def main():
     assert data.startswith(b'\x89PNG\r\n\x1a\n')
     Path('/tmp/screenshot-preview.png').write_bytes(data)
     providers = {key: bool(os.environ.get(key)) for key in ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY']}
-    result = {'status': 'PASS', 'preview': {'status': 'PASS', 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'artifact': 'reports/screenshot-preview.png'},
+    result = {'status': 'PASS', 'preview': {'status': 'PASS', 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'artifact': 'private/service-reports/screenshot-preview.png'},
               'playwright_version': importlib.metadata.version('playwright'),
               'provider_configured': providers,
               'generation': {'status': 'NOT_TESTED' if any(providers.values()) else 'OPTIONAL_PROVIDER_BLOCK',

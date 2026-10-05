@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile": "L2",
-  "initialize_on_start": true,
+  "initialize_on_start": false,
   "hook_trust": "native_user_review",
   "context": {
     "warning_percent": 70,
@@ -17,5 +17,8 @@
     "task_memory": "codex_summary_with_powercontext_basic",
     "powercontext_full_generation": "requires_separate_provider_configuration",
     "oauth_token_export": false
-  }
+  },
+  "activation": "explicit_human_request_per_chat",
+  "preparation": "preview_then_one_scope_approval",
+  "native_permissions": "read_only_before_scope; verify_effective_host_state"
 }

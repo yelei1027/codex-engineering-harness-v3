@@ -1,7 +1,7 @@
 services:
   screenshot-backend:
-    image: codex-harness-screenshot-backend:d026163
-    container_name: codex-harness-screenshot-backend
+    image: ${HARNESS_SCREENSHOT_BACKEND_IMAGE:?prepare managed service layout first}
+    container_name: ${HARNESS_SERVICE_NAMESPACE:?}-screenshot-backend
     env_file: .env
     ports:
       - "127.0.0.1:${SCREENSHOT_BACKEND_PORT:-17001}:7001"
@@ -15,8 +15,8 @@ services:
       start_period: 30s
     restart: unless-stopped
   screenshot-frontend:
-    image: codex-harness-screenshot-frontend:d026163
-    container_name: codex-harness-screenshot-frontend
+    image: ${HARNESS_SCREENSHOT_FRONTEND_IMAGE:?prepare managed service layout first}
+    container_name: ${HARNESS_SERVICE_NAMESPACE:?}-screenshot-frontend
     environment:
       PROXY_CODEGEN_BACKEND: http://screenshot-backend:7001
     ports:
@@ -29,6 +29,12 @@ services:
     restart: unless-stopped
 volumes:
   screenshot-logs:
-    name: codex-harness-screenshot-logs
+    name: ${HARNESS_VOLUME_NAMESPACE:?}-screenshot-logs
+    labels:
+      com.harness.state_id: ${HARNESS_STATE_ID:?}
+      com.harness.data_namespace: ${HARNESS_VOLUME_NAMESPACE:?}
   screenshot-assets:
-    name: codex-harness-screenshot-assets
+    name: ${HARNESS_VOLUME_NAMESPACE:?}-screenshot-assets
+    labels:
+      com.harness.state_id: ${HARNESS_STATE_ID:?}
+      com.harness.data_namespace: ${HARNESS_VOLUME_NAMESPACE:?}

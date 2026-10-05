@@ -1,7 +1,17 @@
 import os
 import stat
+import contextvars
+import contextlib
 from pathlib import Path
 from .common import HarnessError, atomic, canonical, new_id, now, read_json, sha, state_dir, write_json
+
+operation_parent=contextvars.ContextVar('harness_operation_parent',default=None)
+
+@contextlib.contextmanager
+def operation_scope(identifier):
+    token=operation_parent.set(identifier)
+    try:yield
+    finally:operation_parent.reset(token)
 
 def image(path):
     path = Path(path)
@@ -27,6 +37,7 @@ class Transaction:
         self.path = state_dir()/'transactions'/self.id/'journal.json'
         self.backup = state_dir()/'backups'/self.id
         self.doc = {'id': self.id, 'reason': reason, 'started': now(), 'status': 'OPEN', 'touch_set': []}
+        if operation_parent.get():self.doc['parent_operation']=operation_parent.get()
         self.save()
 
     def save(self):

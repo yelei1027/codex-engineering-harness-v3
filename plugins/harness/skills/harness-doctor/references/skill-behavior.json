@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "harness_version": "3.1.1",
-  "registration_owner": "project binding chooses single plugin or standalone skills source, never both",
+  "harness_version": "3.2.0",
+  "registration_owner": "One global explicit-request entry; one project skills source and Main Router; no duplicate plugin/standalone hooks",
   "runtime_selection": "UNVERIFIED",
   "skills": [
     {
@@ -29,7 +29,8 @@
           "GLOSSARY.md",
           "docs/adr/"
         ]
-      }
+      },
+      "invocation_policy_sha256": "94cd0ab161fb468a836349f5ed482ba58ce8e709a05c57ce533d739dbd35cca9"
     },
     {
       "name": "wayfinder",
@@ -58,7 +59,8 @@
           "docs/agents/issue-tracker.md"
         ],
         "remote_side_effects": "Issue creation/commenting/closing depend on chosen tracker and authorization"
-      }
+      },
+      "invocation_policy_sha256": "88bc81a11a6d52ac67aeaa76b8b619e387020d47c5133a4dd4927fd15c4ad073"
     },
     {
       "name": "codebase-design",
@@ -75,7 +77,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f"
     },
     {
       "name": "research",
@@ -92,7 +95,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "9b4c470d63221c1f68f22df70b83e2f12401b317babe0d1b7b5f24a974474d0d"
     },
     {
       "name": "to-spec",
@@ -113,7 +117,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "1c5b4d1e3d8e52287ef19cc2742fdbbfae1914ac75d33af3e4c8174f08cc55bb"
     },
     {
       "name": "to-tickets",
@@ -134,7 +139,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "21bc6215fffcd7614e9f772bb1760e87cc5fc7dcc707e7d282bc9414267a6090"
     },
     {
       "name": "tdd",
@@ -154,7 +160,8 @@
         "children": [],
         "seams": "User confirms public seams before tests; codebase-design consulted when interface is unsettled",
         "loop": "One observable failing test then minimal implementation; refactor at review stage"
-      }
+      },
+      "invocation_policy_sha256": "ea6f01cf1b8c06a4b0f5b649d74b1b8ce8685e72af1b38d70d877693e092af0b"
     },
     {
       "name": "diagnosing-bugs",
@@ -171,7 +178,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "3e430dbe4334a87597488c060cb3dc3786bb00c9182877d6f5ec41f62490e90b"
     },
     {
       "name": "code-review",
@@ -199,7 +207,8 @@
           "spec source",
           "repository standards"
         ]
-      }
+      },
+      "invocation_policy_sha256": "8229ca854e11dc8e6aef2131ee03f31fb1561cf905fab9ccc325180cf3331352"
     },
     {
       "name": "pr",
@@ -216,7 +225,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "2295b586624db4ef546f3fd4695492f039d941a46d8a1593a702ce3ca511b8ad"
     },
     {
       "name": "retro",
@@ -239,7 +249,8 @@
           "writing-for-agents"
         ],
         "side_effects": "Suggests environment improvement; implement as separate scoped work"
-      }
+      },
+      "invocation_policy_sha256": "cb6fb9d7e6b4be5975f41f6def1dd00a1255bad5d9b02696b124c924a8b8745c"
     },
     {
       "name": "implement",
@@ -263,7 +274,8 @@
         "commit": "Commits current branch",
         "nested_orchestration": false,
         "permission_gate": "X00 requires review/commit permission before invocation; no automatic outer worker dispatch"
-      }
+      },
+      "invocation_policy_sha256": "8970a8596ade0c28ab427f41a4ea242d6bdf6186c59ebf55e1238dbecaab79dc"
     },
     {
       "name": "implement-spec",
@@ -293,7 +305,8 @@
           "code-review internal Standards/Spec"
         ],
         "permission_gate": "Only explicit X00; authorize complete write set and remote operations before invocation; suspend duplicate outer orchestration"
-      }
+      },
+      "invocation_policy_sha256": "fd41efb42c60c96320d6531be7e4bf15cbf5518cd652d57dff27ccffa46988e9"
     },
     {
       "name": "domain-modeling",
@@ -310,7 +323,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "f6bf2aa996c6e6f53fdd0708e18a0d16a56aed8322cca59fedbe3c0d2c75f06b"
     },
     {
       "name": "prototype",
@@ -327,7 +341,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "5af65e43ab41a350436697b81e27b7f848d36782043b73c322bb2c9fa9cc55dc"
     },
     {
       "name": "grilling",
@@ -344,7 +359,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "1411d7df7d99b7e621a1ff8283c8133cc2464be63d064e52d8ce169c6800ee9b"
     },
     {
       "name": "writing-for-agents",
@@ -361,7 +377,8 @@
       "behavior": {
         "classification": "METHOD",
         "details": "Read installed upstream SKILL.md at invocation; permissions remain task scoped."
-      }
+      },
+      "invocation_policy_sha256": "eacb24b2a618cfb81dacb0416f4fdd75ddf3a8060f8ddb99aae1b1e301907e4b"
     },
     {
       "name": "planning-with-files",
@@ -440,7 +457,8 @@
         "selection": "L2/long tasks selected by Main",
         "plan_owner": "Main only; workers use separate ledgers",
         "session_history": "Explicit user request only"
-      }
+      },
+      "invocation_policy_sha256": null
     },
     {
       "name": "open-code-review-delegate",
@@ -455,7 +473,7 @@
         "compatibility"
       ],
       "upstream_frontmatter_removed": {
-        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint \u2014 delegation mode is LLM-free on the OCR side.\n"
+        "compatibility": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary). Does NOT require a configured LLM endpoint — delegation mode is LLM-free on the OCR side.\n"
       },
       "adaptation": "Supported Codex frontmatter only; agents/openai.yaml invocation policy unchanged.",
       "behavior": {
@@ -463,15 +481,17 @@
         "children": [],
         "dirty_limit": "Workspace preview alone omits earlier committed task changes; pair unified snapshot and task-base range",
         "review_only": "Do not apply optional fixes without review-and-fix authorization"
-      }
+      },
+      "invocation_policy_sha256": null
     },
     {
       "name": "harness-dev",
       "component": "harness",
       "source": "local V3 contract",
-      "installed_sha256": "9d2922a9a4280029909352a4acfadb7f7c8e624c0e1e5ea4bee3fe546837e15c",
+      "installed_sha256": "2f7e9dbb0350cfdb9ae77a9e0e7b3bdfa05b38b725e9ed35325f53f28b8e99b9",
       "allow_implicit_invocation": true,
-      "runtime_selection": "BASE_ROUTER_REAL_NATIVE_PASS; CLI_BINDING_HINT_ADDED_AFTER_ACCEPTANCE"
+      "runtime_selection": "SOURCE_CHANGED; actual native model selection UNVERIFIED",
+      "invocation_policy_sha256": "e490c116ecc1961c8e53d96d0e4ae9e8d9a3525ace874ac8deb7176277e6d0ae"
     },
     {
       "name": "harness-doctor",
@@ -479,15 +499,26 @@
       "source": "local V3 contract",
       "installed_sha256": "fc6424f4afbc8d5a72671f8d6921c1b0f06faead201dbc74a811d1c96f1119b8",
       "allow_implicit_invocation": true,
-      "runtime_selection": "UNVERIFIED"
+      "runtime_selection": "UNVERIFIED",
+      "invocation_policy_sha256": "33f894de6451cfa017fee150dc3c0cbb3aa3ecd1b27f0355152e5ff883efb491"
     },
     {
       "name": "harness-maintain",
       "component": "harness",
       "source": "local V3 contract",
-      "installed_sha256": "a75f155fd20f57528210d28ae71402762f9c9b5bf08a96c0ceace78603d96ba9",
+      "installed_sha256": "0453d5451e938e40f32a24c6909e07e8f0d2f92517bda17127a37cb5e7f5e89e",
       "allow_implicit_invocation": true,
-      "runtime_selection": "UNVERIFIED"
+      "runtime_selection": "SOURCE_CHANGED; actual native model selection UNVERIFIED",
+      "invocation_policy_sha256": "d16f4f3e91536fb0707849f618c11d59e06695566878450f362cbe08e3e5d2cd"
+    },
+    {
+      "name": "harness-entry",
+      "component": "harness",
+      "source": "local Main Router entry",
+      "runtime_selection": "SOURCE_CHANGED; actual native model selection UNVERIFIED",
+      "installed_sha256": "8b798a2bb18dcc5574fadb4028cc7ae67003830f364f4252534f91906a1276f8",
+      "allow_implicit_invocation": true,
+      "invocation_policy_sha256": "f00a6043cd39bad3af360e64bfd8ffb71743bde6b3410e97dfe389018253c5be"
     }
   ]
 }
