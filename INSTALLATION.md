@@ -16,7 +16,7 @@
 
 检查被当前权限拒绝时显示 `UNVERIFIED`（未核验），并列入 `unverified`；它不代表组件未安装或服务未运行。先在已授权且可访问该组件的环境中重跑 `harness preflight`，不要据此安装或重启服务，也不要为预检开放业务项目 Full access。未核验项仍会阻止完整准备，不能当作通过。
 
-当前支持目标是个人 Linux x86_64 Codex Desktop。先核对 Git、Node/npm、Python 3、uv、Docker Compose、用户级 systemd 和 Codex Desktop。私有仓库访问先使用 `gh auth login`，不会把 Codex 登录凭据导出给第三方 Provider。
+当前支持目标是个人 Linux x86_64 Codex Desktop。先核对 Git、Node/npm、Python 3、uv、Docker Compose、用户级 systemd 和 Codex Desktop。仓库公开可读；当前发行安装器仍检查 GitHub CLI 登录状态，先使用 `gh auth login`。该步骤不会把 Codex 登录凭据导出给第三方 Provider。
 
 正式包的获取方式见 [README](README.md)。使用已经确认的新版源码或解包目录时，可以从任意位置运行：
 

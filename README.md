@@ -20,14 +20,14 @@
 
 **位置：终端 · Bash。工作目录：任意目录。前提：Linux x86_64、Git、Python 3、Node.js/npm、uv、Docker Compose v2、用户级 systemd、Codex Desktop 和 GitHub CLI 已准备。**
 
-仓库为私有仓库，先登录有访问权限的 GitHub 账号：
+仓库已公开，浏览源码和下载发行文件无需仓库访问授权。当前安装器使用 GitHub CLI，并检查其登录状态；按现有安装流程先登录你的 GitHub 账号：
 
 ```bash
 gh auth login
 gh auth status
 ```
 
-预期：第二条命令显示登录成功且账号可访问仓库。然后下载安装脚本到独立临时目录并运行指定版本：
+预期：第二条命令显示 GitHub CLI 登录成功。然后下载安装脚本到独立临时目录并运行指定版本：
 
 **位置：同一个 Linux Bash 终端。用途：首次安装 v3.3.0。**
 
@@ -123,3 +123,11 @@ harness prepare "/你的项目路径" --apply
 - [完整流程 HTML](docs/codex_engineering_harness_v3_parallel_flow.html)：下载后在浏览器打开；它是说明书，不是命令执行器。
 
 当前发行不自动替换你的本机安装。原生补丁拒写原始返回不可获取等限制仍保留；正式发布不代表完整 PRD 的所有原生验收已通过。
+
+## 许可证与源码贡献
+
+Harness 自有实现采用 [MIT License](LICENSE)。集成组件保留各自许可证，详见 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)；其中 context-mode 使用 Elastic License 2.0，其使用与再分发限制以该许可证为准，不能将整个集成包都视为 MIT。
+
+欢迎通过 Issues 提交复现步骤或需求，通过 Pull Requests 提交改进。修改前阅读 [AGENTS.md](AGENTS.md)，保留用户配置与数据，说明验证范围；未经验证的原生 Desktop 或 Provider 行为应标明未验证。
+
+源码中的 [完整流程图](docs/codex_engineering_harness_v3_parallel_flow.html) 保留 V3 蓝白布局，并由当前工程契约生成节点内容。发行版附件对应发布时的快照，最新文档以仓库默认分支为准。

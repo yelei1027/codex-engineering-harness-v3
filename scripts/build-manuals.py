@@ -28,6 +28,15 @@ function choose(kind){vague.setAttribute('aria-pressed',String(kind==='vague'));
 vague.addEventListener('click',()=>choose('vague'));clear.addEventListener('click',()=>choose('clear'));
 </script></body></html>'''
 text=text.replace('__COUNT__',str(len(contract['nodes']))).replace('__ROWS__',rows)
-for name in ['codex_engineering_harness_v3_formal_manual.html','codex_engineering_harness_v3_parallel_flow.html']:
+for name in ['codex_engineering_harness_v3_formal_manual.html']:
     (ROOT/'docs'/name).write_text(text)
+
+# The detailed flow keeps the V3 visual template instead of duplicating the compact guide.
+import re
+flow = (ROOT/'templates/parallel-flow.html').read_text()
+node_map = {node['id']: node for node in contract['nodes']}
+flow = re.sub(r'\{\{([A-Z0-9]+)\.([a-z_]+)\}\}', lambda m: e(node_map[m[1]][m[2]]), flow)
+flow = flow.replace('{{CONTRACT}}', json.dumps(contract, ensure_ascii=False).replace('<', '\\u003c'))
+(ROOT/'docs/codex_engineering_harness_v3_parallel_flow.html').write_text(flow)
+
 print('Generated both manuals from',len(contract['nodes']),'compatible engineering nodes')
